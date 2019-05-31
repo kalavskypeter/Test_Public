@@ -1,0 +1,243 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<EntityList xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <Attributes>
+    <EntityName>opportunity</EntityName>
+    <CamelCase>Opportunity</CamelCase>
+    <VisualStudioProjectId>00000000-0000-0000-0000-000000000000</VisualStudioProjectId>
+    <ClassBinding />
+  </Attributes>
+  <ComponentId>00000000-0000-0000-0000-000000000000</ComponentId>
+  <Name>Now - Color Coded</Name>
+  <Kind>List</Kind>
+  <IsDefault>false</IsDefault>
+  <IsHidden>true</IsHidden>
+  <OrderBy>name</OrderBy>
+  <MultiSelectCommands>Export||</MultiSelectCommands>
+  <SerializedBindings>
+    <string>transactioncurrencyid</string>
+    <string>estimatedvalue</string>
+    <string>opportunityid</string>
+    <string>customerid</string>
+    <string>opportunityratingcode</string>
+    <string>statuscode</string>
+    <string>name</string>
+  </SerializedBindings>
+  <SerializedTemplates>
+    <RowTemplate>
+      <DesignWidth>320</DesignWidth>
+      <DesignHeight>48</DesignHeight>
+      <Name>Default</Name>
+      <Width>320</Width>
+      <Height>68</Height>
+      <SerializedBackground>0</SerializedBackground>
+      <SerializedSelectedBackground>0</SerializedSelectedBackground>
+      <SerializedChildren>
+        <CellTemplate SchemaName="name">
+          <IsConstant>false</IsConstant>
+          <StyleName>H10</StyleName>
+          <Bounds>64,8,152,22</Bounds>
+          <CellKind>0</CellKind>
+          <Anchor>13</Anchor>
+        </CellTemplate>
+        <CellTemplate SchemaName="Now.opportunity.png">
+          <IsConstant>true</IsConstant>
+          <StyleName>CallImage</StyleName>
+          <Bounds>8,8,40,40</Bounds>
+          <CellKind>1</CellKind>
+          <Anchor>7</Anchor>
+        </CellTemplate>
+        <CellTemplate SchemaName="customerid">
+          <IsConstant>false</IsConstant>
+          <StyleName>gray</StyleName>
+          <Bounds>64,30,152,22</Bounds>
+          <CellKind>0</CellKind>
+          <Anchor>13</Anchor>
+        </CellTemplate>
+        <CellTemplate SchemaName="estimatedvalue">
+          <IsConstant>false</IsConstant>
+          <StyleName>H10R</StyleName>
+          <Bounds>216,8,96,22</Bounds>
+          <CellKind>0</CellKind>
+          <Anchor>9</Anchor>
+        </CellTemplate>
+        <CellTemplate SchemaName="statuscode">
+          <IsConstant>false</IsConstant>
+          <StyleName>CallStatus</StyleName>
+          <Bounds>8,49,40,11</Bounds>
+          <CellKind>0</CellKind>
+          <Anchor>5</Anchor>
+        </CellTemplate>
+        <CellTemplate SchemaName="opportunityratingcode">
+          <IsConstant>false</IsConstant>
+          <StyleName>H10RU</StyleName>
+          <Bounds>216,30,95,22</Bounds>
+          <CellKind>5</CellKind>
+          <Anchor>13</Anchor>
+        </CellTemplate>
+      </SerializedChildren>
+    </RowTemplate>
+    <RowTemplate>
+      <DesignWidth>320</DesignWidth>
+      <DesignHeight>48</DesignHeight>
+      <Name>Cold</Name>
+      <Width>320</Width>
+      <Height>68</Height>
+      <SerializedBackground>-789761</SerializedBackground>
+      <SerializedSelectedBackground>-789761</SerializedSelectedBackground>
+      <SerializedChildren>
+        <CellTemplate SchemaName="name">
+          <IsConstant>false</IsConstant>
+          <StyleName>H10</StyleName>
+          <Bounds>64,8,152,22</Bounds>
+          <CellKind>0</CellKind>
+          <Anchor>13</Anchor>
+        </CellTemplate>
+        <CellTemplate SchemaName="Now.opportunity.png">
+          <IsConstant>true</IsConstant>
+          <StyleName>CallImage</StyleName>
+          <Bounds>8,8,40,40</Bounds>
+          <CellKind>1</CellKind>
+          <Anchor>7</Anchor>
+        </CellTemplate>
+        <CellTemplate SchemaName="customerid">
+          <IsConstant>false</IsConstant>
+          <StyleName>gray</StyleName>
+          <Bounds>64,30,152,22</Bounds>
+          <CellKind>0</CellKind>
+          <Anchor>13</Anchor>
+        </CellTemplate>
+        <CellTemplate SchemaName="estimatedvalue">
+          <IsConstant>false</IsConstant>
+          <StyleName>H10R</StyleName>
+          <Bounds>216,8,96,22</Bounds>
+          <CellKind>0</CellKind>
+          <Anchor>9</Anchor>
+        </CellTemplate>
+        <CellTemplate SchemaName="statuscode">
+          <IsConstant>false</IsConstant>
+          <StyleName>CallStatus</StyleName>
+          <Bounds>8,49,40,11</Bounds>
+          <CellKind>0</CellKind>
+          <Anchor>5</Anchor>
+        </CellTemplate>
+        <CellTemplate SchemaName="opportunityratingcode">
+          <IsConstant>false</IsConstant>
+          <StyleName>H10RU</StyleName>
+          <Bounds>216,30,95,22</Bounds>
+          <CellKind>5</CellKind>
+          <Anchor>9</Anchor>
+        </CellTemplate>
+      </SerializedChildren>
+    </RowTemplate>
+    <RowTemplate>
+      <DesignWidth>320</DesignWidth>
+      <DesignHeight>48</DesignHeight>
+      <Name>Warm</Name>
+      <Width>320</Width>
+      <Height>68</Height>
+      <SerializedBackground>-9548</SerializedBackground>
+      <SerializedSelectedBackground>-9548</SerializedSelectedBackground>
+      <SerializedChildren>
+        <CellTemplate SchemaName="name">
+          <IsConstant>false</IsConstant>
+          <StyleName>H10</StyleName>
+          <Bounds>64,8,152,22</Bounds>
+          <CellKind>0</CellKind>
+          <Anchor>13</Anchor>
+        </CellTemplate>
+        <CellTemplate SchemaName="Now.opportunity.png">
+          <IsConstant>true</IsConstant>
+          <StyleName>CallImage</StyleName>
+          <Bounds>8,8,40,40</Bounds>
+          <CellKind>1</CellKind>
+          <Anchor>7</Anchor>
+        </CellTemplate>
+        <CellTemplate SchemaName="customerid">
+          <IsConstant>false</IsConstant>
+          <StyleName>gray</StyleName>
+          <Bounds>64,30,152,22</Bounds>
+          <CellKind>0</CellKind>
+          <Anchor>13</Anchor>
+        </CellTemplate>
+        <CellTemplate SchemaName="estimatedvalue">
+          <IsConstant>false</IsConstant>
+          <StyleName>H10R</StyleName>
+          <Bounds>216,8,96,22</Bounds>
+          <CellKind>0</CellKind>
+          <Anchor>9</Anchor>
+        </CellTemplate>
+        <CellTemplate SchemaName="statuscode">
+          <IsConstant>false</IsConstant>
+          <StyleName>CallStatus</StyleName>
+          <Bounds>8,49,40,11</Bounds>
+          <CellKind>0</CellKind>
+          <Anchor>5</Anchor>
+        </CellTemplate>
+        <CellTemplate SchemaName="opportunityratingcode">
+          <IsConstant>false</IsConstant>
+          <StyleName>H10RU</StyleName>
+          <Bounds>216,30,95,22</Bounds>
+          <CellKind>5</CellKind>
+          <Anchor>9</Anchor>
+        </CellTemplate>
+      </SerializedChildren>
+    </RowTemplate>
+    <RowTemplate>
+      <DesignWidth>320</DesignWidth>
+      <DesignHeight>48</DesignHeight>
+      <Name>Hot</Name>
+      <Width>320</Width>
+      <Height>68</Height>
+      <SerializedBackground>-13365</SerializedBackground>
+      <SerializedSelectedBackground>-21589</SerializedSelectedBackground>
+      <SerializedChildren>
+        <CellTemplate SchemaName="name">
+          <IsConstant>false</IsConstant>
+          <StyleName>H10</StyleName>
+          <Bounds>64,8,152,22</Bounds>
+          <CellKind>0</CellKind>
+          <Anchor>13</Anchor>
+        </CellTemplate>
+        <CellTemplate SchemaName="Now.opportunity.png">
+          <IsConstant>true</IsConstant>
+          <StyleName>CallImage</StyleName>
+          <Bounds>8,8,40,40</Bounds>
+          <CellKind>1</CellKind>
+          <Anchor>7</Anchor>
+        </CellTemplate>
+        <CellTemplate SchemaName="customerid">
+          <IsConstant>false</IsConstant>
+          <StyleName>gray</StyleName>
+          <Bounds>64,30,152,22</Bounds>
+          <CellKind>0</CellKind>
+          <Anchor>13</Anchor>
+        </CellTemplate>
+        <CellTemplate SchemaName="estimatedvalue">
+          <IsConstant>false</IsConstant>
+          <StyleName>H10R</StyleName>
+          <Bounds>216,8,96,22</Bounds>
+          <CellKind>0</CellKind>
+          <Anchor>9</Anchor>
+        </CellTemplate>
+        <CellTemplate SchemaName="statuscode">
+          <IsConstant>false</IsConstant>
+          <StyleName>CallStatus</StyleName>
+          <Bounds>8,49,40,11</Bounds>
+          <CellKind>0</CellKind>
+          <Anchor>5</Anchor>
+        </CellTemplate>
+        <CellTemplate SchemaName="opportunityratingcode">
+          <IsConstant>false</IsConstant>
+          <StyleName>H10RU</StyleName>
+          <Bounds>216,30,95,22</Bounds>
+          <CellKind>5</CellKind>
+          <Anchor>9</Anchor>
+        </CellTemplate>
+      </SerializedChildren>
+    </RowTemplate>
+  </SerializedTemplates>
+  <TemplateSelectorRule>&lt;?xml version="1.0" encoding="utf-16"?&gt;&lt;Workflow e="true" isvalid="true" syntaxVersion="7" version="0"&gt;&lt;branch e="true"&gt;&lt;if e="true"&gt;&lt;conditions e="true" op="And"&gt;&lt;condition e="false"&gt;&lt;var&gt;Entity.opportunityratingcode&lt;/var&gt;&lt;arg&gt;Picklist:3&lt;/arg&gt;&lt;op&gt;Equal&lt;/op&gt;&lt;/condition&gt;&lt;/conditions&gt;&lt;action e="true"&gt;&lt;function e="false"&gt;&lt;var&gt;TemplateIndex&lt;/var&gt;&lt;arg&gt;Integer:1&lt;/arg&gt;&lt;func&gt;Assign&lt;/func&gt;&lt;/function&gt;&lt;/action&gt;&lt;/if&gt;&lt;if e="true"&gt;&lt;conditions e="true" op="And"&gt;&lt;condition e="false"&gt;&lt;var&gt;Entity.opportunityratingcode&lt;/var&gt;&lt;arg&gt;Picklist:2&lt;/arg&gt;&lt;op&gt;Equal&lt;/op&gt;&lt;/condition&gt;&lt;/conditions&gt;&lt;action e="true"&gt;&lt;function e="false"&gt;&lt;var&gt;TemplateIndex&lt;/var&gt;&lt;arg&gt;Integer:2&lt;/arg&gt;&lt;func&gt;Assign&lt;/func&gt;&lt;/function&gt;&lt;/action&gt;&lt;/if&gt;&lt;if e="true"&gt;&lt;conditions e="true" op="And"&gt;&lt;condition e="false"&gt;&lt;var&gt;Entity.opportunityratingcode&lt;/var&gt;&lt;arg&gt;Picklist:1&lt;/arg&gt;&lt;op&gt;Equal&lt;/op&gt;&lt;/condition&gt;&lt;/conditions&gt;&lt;action e="true"&gt;&lt;function e="false"&gt;&lt;var&gt;TemplateIndex&lt;/var&gt;&lt;arg&gt;Integer:3&lt;/arg&gt;&lt;func&gt;Assign&lt;/func&gt;&lt;/function&gt;&lt;/action&gt;&lt;/if&gt;&lt;if e="true"&gt;&lt;conditions e="false" op="And" /&gt;&lt;action e="true"&gt;&lt;function e="false"&gt;&lt;var&gt;TemplateIndex&lt;/var&gt;&lt;arg&gt;Integer:0&lt;/arg&gt;&lt;func&gt;Assign&lt;/func&gt;&lt;/function&gt;&lt;/action&gt;&lt;/if&gt;&lt;/branch&gt;&lt;/Workflow&gt;</TemplateSelectorRule>
+  <CustomProperties />
+  <SerializedChildren />
+  <Height>40</Height>
+</EntityList>

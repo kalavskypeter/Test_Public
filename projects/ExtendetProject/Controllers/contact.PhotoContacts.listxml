@@ -1,0 +1,71 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<EntityList xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <Attributes>
+    <EntityName>contact</EntityName>
+    <VisualStudioProjectId>c0f71827-e4f6-464e-a71d-c36687d5738e</VisualStudioProjectId>
+    <ClassBinding />
+  </Attributes>
+  <ComponentId>00000000-0000-0000-0000-000000000000</ComponentId>
+  <Name>PhotoContacts</Name>
+  <Kind>AssociatedList</Kind>
+  <IsDefault>false</IsDefault>
+  <HasGpsFields>true</HasGpsFields>
+  <OrderBy>fullname</OrderBy>
+  <SerializedBindings>
+    <string>address1_city</string>
+    <string>address1_country</string>
+    <string>address1_latitude</string>
+    <string>address1_longitude</string>
+    <string>address1_stateorprovince</string>
+    <string>address1_line1</string>
+    <string>address1_line2</string>
+    <string>address1_line3</string>
+    <string>address1_postalcode</string>
+    <string>telephone1</string>
+    <string>contactid</string>
+    <string>createdon</string>
+    <string>emailaddress1</string>
+    <string>fax</string>
+    <string>firstname</string>
+    <string>fullname</string>
+    <string>jobtitle</string>
+    <string>lastname</string>
+    <string>mobilephone</string>
+    <string>modifiedon</string>
+    <string>ownerid</string>
+    <string>parentcustomerid</string>
+    <string>statecode</string>
+    <string>statuscode</string>
+  </SerializedBindings>
+  <SerializedTemplates>
+    <RowTemplate>
+      <DesignWidth>320</DesignWidth>
+      <DesignHeight>48</DesignHeight>
+      <Name>Default</Name>
+      <Width>96</Width>
+      <Height>96</Height>
+      <SerializedBackground>0</SerializedBackground>
+      <SerializedSelectedBackground>0</SerializedSelectedBackground>
+      <Buttons>none</Buttons>
+      <SerializedChildren>
+        <CellTemplate SchemaName="fullname">
+          <IsConstant>false</IsConstant>
+          <StyleName>black_center</StyleName>
+          <Bounds>0,80,96,16</Bounds>
+          <CellKind>0</CellKind>
+          <Anchor>13</Anchor>
+        </CellTemplate>
+        <CellTemplate SchemaName="img">
+          <IsConstant>true</IsConstant>
+          <StyleName>ListNoteImage</StyleName>
+          <Bounds>1,1,94,78</Bounds>
+          <CellKind>1</CellKind>
+          <Anchor>5</Anchor>
+        </CellTemplate>
+      </SerializedChildren>
+    </RowTemplate>
+  </SerializedTemplates>
+  <CustomProperties />
+  <SerializedChildren />
+  <Height>0</Height>
+</EntityList>

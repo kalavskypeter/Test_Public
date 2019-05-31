@@ -1,0 +1,121 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<EntityList xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <Attributes>
+    <EntityName>lead</EntityName>
+    <VisualStudioProjectId>c0f71827-e4f6-464e-a71d-c36687d5738e</VisualStudioProjectId>
+    <ClassBinding />
+  </Attributes>
+  <ComponentId>00000000-0000-0000-0000-000000000000</ComponentId>
+  <Name>Now</Name>
+  <Kind>List</Kind>
+  <IsDefault>false</IsDefault>
+  <HasGpsFields>true</HasGpsFields>
+  <Fetch version="1.0">
+    <entity name="lead" />
+  </Fetch>
+  <Search>
+    <attribute schema="companyname" method="BeginsWith" />
+    <attribute schema="fullname" method="BeginsWith" />
+  </Search>
+  <OrderBy>fullname</OrderBy>
+  <SortAllowedFields>address1_city;emailaddress1;firstname;lastname;mobilephone;fullname;leadqualitycode;address1_line1;subject;address1_postalcode</SortAllowedFields>
+  <FilterAllowedFields>address1_city;emailaddress1;firstname;lastname;leadsourcecode;mobilephone;fullname;leadqualitycode;address1_line1;subject;address1_postalcode</FilterAllowedFields>
+  <MultiSelectCommands />
+  <SerializedBindings>
+    <string>address1_latitude</string>
+    <string>address1_longitude</string>
+    <string>telephone1</string>
+    <string>address1_city</string>
+    <string>companyname</string>
+    <string>address1_country</string>
+    <string>createdon</string>
+    <string>customerid</string>
+    <string>emailaddress1</string>
+    <string>estimatedclosedate</string>
+    <string>estimatedamount</string>
+    <string>firstname</string>
+    <string>lastname</string>
+    <string>leadid</string>
+    <string>leadsourcecode</string>
+    <string>mobilephone</string>
+    <string>modifiedon</string>
+    <string>fullname</string>
+    <string>ownerid</string>
+    <string>leadqualitycode</string>
+    <string>address1_stateorprovince</string>
+    <string>statecode</string>
+    <string>statuscode</string>
+    <string>address1_line1</string>
+    <string>address1_line2</string>
+    <string>address1_line3</string>
+    <string>subject</string>
+    <string>address1_postalcode</string>
+  </SerializedBindings>
+  <SerializedTemplates>
+    <RowTemplate>
+      <DesignWidth>320</DesignWidth>
+      <DesignHeight>48</DesignHeight>
+      <Name>Default</Name>
+      <Width>320</Width>
+      <Height>68</Height>
+      <SerializedBackground>0</SerializedBackground>
+      <SerializedSelectedBackground>0</SerializedSelectedBackground>
+      <Buttons>Call;Email;ChangeStatus.lead.4,6,7;Favorite;AssignToMe</Buttons>
+      <SerializedChildren>
+        <CellTemplate SchemaName="fullname">
+          <IsConstant>false</IsConstant>
+          <StyleName>H10</StyleName>
+          <Bounds>72,6,240,24</Bounds>
+          <CellKind>0</CellKind>
+          <Anchor>13</Anchor>
+        </CellTemplate>
+        <CellTemplate SchemaName="address1_line1">
+          <IsConstant>false</IsConstant>
+          <StyleName>gray</StyleName>
+          <Bounds>72,30,85,14</Bounds>
+          <CellKind>0</CellKind>
+          <Anchor>13</Anchor>
+        </CellTemplate>
+        <CellTemplate SchemaName="address1_postalcode">
+          <IsConstant>false</IsConstant>
+          <StyleName>gray</StyleName>
+          <Bounds>157,30,77,14</Bounds>
+          <CellKind>0</CellKind>
+          <Anchor>8</Anchor>
+        </CellTemplate>
+        <CellTemplate SchemaName="address1_city">
+          <IsConstant>false</IsConstant>
+          <StyleName>r_gray</StyleName>
+          <Bounds>235,30,77,14</Bounds>
+          <CellKind>0</CellKind>
+          <Anchor>8</Anchor>
+        </CellTemplate>
+        <CellTemplate SchemaName="leadqualitycode">
+          <IsConstant>false</IsConstant>
+          <StyleName>LeadImageStyle</StyleName>
+          <Bounds>14,8,40,40</Bounds>
+          <CellKind>8</CellKind>
+          <IsFormatted>false</IsFormatted>
+          <Anchor>5</Anchor>
+        </CellTemplate>
+        <CellTemplate SchemaName="mobilephone">
+          <IsConstant>false</IsConstant>
+          <StyleName>gray</StyleName>
+          <Bounds>72,44,98,14</Bounds>
+          <CellKind>0</CellKind>
+          <Anchor>5</Anchor>
+        </CellTemplate>
+        <CellTemplate SchemaName="emailaddress1">
+          <IsConstant>false</IsConstant>
+          <StyleName>gray</StyleName>
+          <Bounds>171,44,141,14</Bounds>
+          <CellKind>0</CellKind>
+          <Anchor>13</Anchor>
+        </CellTemplate>
+      </SerializedChildren>
+    </RowTemplate>
+  </SerializedTemplates>
+  <CustomProperties />
+  <SerializedChildren />
+  <Height>0</Height>
+</EntityList>

@@ -1,0 +1,75 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<EntityList xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <Attributes>
+    <EntityName>quote</EntityName>
+    <CamelCase>Quote</CamelCase>
+    <VisualStudioProjectId>00000000-0000-0000-0000-000000000000</VisualStudioProjectId>
+    <ClassBinding />
+  </Attributes>
+  <ComponentId>00000000-0000-0000-0000-000000000000</ComponentId>
+  <Name>Now</Name>
+  <Kind>List</Kind>
+  <IsDefault>false</IsDefault>
+  <OrderBy>name</OrderBy>
+  <SortAllowedFields>name;customerid;statecode;statuscode;totalamount</SortAllowedFields>
+  <FilterAllowedFields>name;customerid;statecode;statuscode;totalamount</FilterAllowedFields>
+  <SerializedBindings>
+    <string>transactioncurrencyid</string>
+    <string>name</string>
+    <string>customerid</string>
+    <string>quoteid</string>
+    <string>statecode</string>
+    <string>totalamount</string>
+  </SerializedBindings>
+  <SerializedTemplates>
+    <RowTemplate>
+      <DesignWidth>320</DesignWidth>
+      <DesignHeight>48</DesignHeight>
+      <Name>Default</Name>
+      <Width>320</Width>
+      <Height>68</Height>
+      <SerializedBackground>0</SerializedBackground>
+      <SerializedSelectedBackground>0</SerializedSelectedBackground>
+      <SerializedChildren>
+        <CellTemplate SchemaName="name">
+          <IsConstant>false</IsConstant>
+          <StyleName>H10</StyleName>
+          <Bounds>64,8,152,22</Bounds>
+          <CellKind>0</CellKind>
+          <Anchor>13</Anchor>
+        </CellTemplate>
+        <CellTemplate SchemaName="Now.quote.png">
+          <IsConstant>true</IsConstant>
+          <StyleName>EmailImage</StyleName>
+          <Bounds>8,8,40,40</Bounds>
+          <CellKind>1</CellKind>
+          <Anchor>7</Anchor>
+        </CellTemplate>
+        <CellTemplate SchemaName="customerid">
+          <IsConstant>false</IsConstant>
+          <StyleName>gray</StyleName>
+          <Bounds>64,30,248,14</Bounds>
+          <CellKind>0</CellKind>
+          <Anchor>5</Anchor>
+        </CellTemplate>
+        <CellTemplate SchemaName="totalamount">
+          <IsConstant>false</IsConstant>
+          <StyleName>H10R</StyleName>
+          <Bounds>216,8,96,22</Bounds>
+          <CellKind>0</CellKind>
+          <Anchor>13</Anchor>
+        </CellTemplate>
+        <CellTemplate SchemaName="statecode">
+          <IsConstant>false</IsConstant>
+          <StyleName>EmailStatus</StyleName>
+          <Bounds>8,50,40,11</Bounds>
+          <CellKind>0</CellKind>
+          <Anchor>5</Anchor>
+        </CellTemplate>
+      </SerializedChildren>
+    </RowTemplate>
+  </SerializedTemplates>
+  <CustomProperties />
+  <SerializedChildren />
+  <Height>40</Height>
+</EntityList>

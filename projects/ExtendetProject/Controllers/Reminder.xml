@@ -1,0 +1,32 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Reminder xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <Items>
+    <ReminderComponent>
+      <Id>058338d1-4218-463f-bfa4-4bcfbe350923</Id>
+      <Binding>appointment</Binding>
+      <StartDateField>scheduledstart</StartDateField>
+      <EndDateField>scheduledend</EndDateField>
+      <DescriptionField>description</DescriptionField>
+      <Fetch version="1.0">
+        <entity name="appointment" />
+      </Fetch>
+      <CalendarIntegration>2</CalendarIntegration>
+    </ReminderComponent>
+    <ReminderComponent>
+      <Id>6bae2db2-a181-42d2-ae88-c63ada01bc38</Id>
+      <Binding>task</Binding>
+      <StartDateField>scheduledstart</StartDateField>
+      <EndDateField>scheduledend</EndDateField>
+      <DescriptionField>description</DescriptionField>
+      <Fetch version="1.0">
+        <entity name="task">
+          <filter>
+            <condition attribute="statecode" operator="eq" value="0" />
+            <condition attribute="ownerid" operator="eq-userid" />
+          </filter>
+        </entity>
+      </Fetch>
+      <CalendarIntegration>0</CalendarIntegration>
+    </ReminderComponent>
+  </Items>
+</Reminder>

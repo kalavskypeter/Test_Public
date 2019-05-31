@@ -1,0 +1,37 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<EntityChart xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <Attributes>
+    <EntityName>opportunity</EntityName>
+    <CamelCase>Opportunity</CamelCase>
+    <VisualStudioProjectId>00000000-0000-0000-0000-000000000000</VisualStudioProjectId>
+    <ClassBinding />
+  </Attributes>
+  <ComponentId>87293554-2482-de11-9ff3-00155da3b012</ComponentId>
+  <Name>Sales Pipeline</Name>
+  <IsHidden>false</IsHidden>
+  <Kind>Funnel</Kind>
+  <IsDefault>false</IsDefault>
+  <DrillDownFields>estimatedvalue;originatingleadid;opportunityratingcode;isrevenuesystemcalculated;name</DrillDownFields>
+  <Series>
+    <Series>
+      <Attribute>estimatedvalue</Attribute>
+      <Aggregation>Sum</Aggregation>
+      <Limit>Top</Limit>
+      <Color>#FF0000FF</Color>
+    </Series>
+  </Series>
+  <Axis>stepname</Axis>
+  <DateGrouping>None</DateGrouping>
+  <SerializedBindings>
+    <string>estimatedvalue</string>
+    <string>stepname</string>
+  </SerializedBindings>
+  <Fetch version="1.0" count="10">
+    <entity name="opportunity">
+      <attribute name="estimatedvalue" aggregate="sum" alias="sum_estimatedvalue" />
+      <attribute name="stepname" groupby="true" alias="stepname" />
+      <order descending="false" alias="stepname" />
+    </entity>
+  </Fetch>
+  <LimitCount>3</LimitCount>
+</EntityChart>

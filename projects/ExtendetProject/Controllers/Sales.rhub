@@ -1,0 +1,86 @@
+<HubDefinition>
+	<Group name='Sales'>
+		<View name='Open Sales'>
+			<EntityView entity='opportunity' view='OpenNow' sort='name' />
+			<EntityView entity='quote' view='OpenNow' sort='name' />
+			<EntityView entity='salesorder' view='OpenNow' sort='name' />
+			<EntityView entity='invoice' view='OpenNow' sort='name' />
+		</View>
+		<View name='All Sales'>
+			<EntityView entity='opportunity' view='Now' sort='name' />
+			<EntityView entity='quote' view='Now' sort='name' />
+			<EntityView entity='salesorder' view='Now' sort='name' />
+			<EntityView entity='invoice' view='Now' sort='name' />
+		</View>
+	</Group>
+	<Group name='opportunity'>
+		<View name='Open Opportunities' >
+			<EntityView entity='opportunity' view='OpenNow' sort='name' />
+		</View>
+		<View name='Won Opportunities' >
+			<EntityView entity='opportunity' view='WonNow' sort='name' />
+		</View>
+		<View name='Lost Opportunities'>
+			<EntityView entity='opportunity' view='LostNow' sort='name' />
+		</View>
+		<View name='All Opportunities' >
+			<EntityView entity='opportunity' view='Now' sort='name' />
+		</View>
+	</Group>
+	<Group name='quote'>
+		<View name='Open Quotes'>
+			<EntityView entity='quote' view='OpenNow' sort='name' />
+		</View>
+		<View name='All Quotes'>
+			<EntityView entity='quote' view='Now' sort='name' />
+		</View>
+	</Group>
+	<Group name='salesorder'>
+		<View name='Open Orders'>
+			<EntityView entity='salesorder' view='OpenNow' sort='name' />
+		</View>
+		<View name='All Orders' >
+			<EntityView entity='salesorder' view='Now' sort='name' />
+		</View>
+	</Group>
+	<Group name='invoice'>
+		<View name='Open Invoices'>
+			<EntityView entity='invoice' view='OpenNow' sort='name' />
+		</View>
+		<View name='Paid Invoices'>
+			<EntityView entity='invoice' view='PaidNow' sort='name' />
+		</View>
+		<View name='All Invoices'>
+			<EntityView entity='invoice' view='Now' sort='name' />
+		</View>
+	</Group>
+
+	<Item entity='opportunity'>
+		<Item property='customerid' entity='account' view='Now2' parent='true'>
+			<Item property='parentcustomerid' entity='contact' view='Now2' parent='false'/>
+		</Item>
+		<Item property='customerid' entity='contact' view='Now2' parent='true'/>
+		<Item property='regardingobjectid' entity='activity' view='Now2' parent='false'/>
+	</Item>
+	<Item entity='quote'>
+		<Item property='customerid' entity='account' view='Now2' parent='true'>
+			<Item property='parentcustomerid' entity='contact' view='Now2' parent='false'/>
+		</Item>
+		<Item property='customerid' entity='contact' view='Now2' parent='true'/>
+		<Item property='regardingobjectid' entity='activity' view='Now2' parent='false'/>
+	</Item>
+	<Item entity='salesorder'>
+		<Item property='customerid' entity='account' view='Now2' parent='true'>
+			<Item property='parentcustomerid' entity='contact' view='Now2' parent='false'/>
+		</Item>
+		<Item property='customerid' entity='contact' view='Now2' parent='true'/>
+		<Item property='regardingobjectid' entity='activity' view='Now2' parent='false'/>
+	</Item>
+	<Item entity='invoice'>
+		<Item property='customerid' entity='account' view='Now2' parent='true'>
+			<Item property='parentcustomerid' entity='contact' view='Now2' parent='false'/>
+		</Item>
+		<Item property='customerid' entity='contact' view='Now2' parent='true'/>
+		<Item property='regardingobjectid' entity='activity' view='Now2' parent='false'/>
+	</Item>
+</HubDefinition>

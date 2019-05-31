@@ -1,0 +1,105 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<EntityList xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <Attributes>
+    <EntityName>email</EntityName>
+    <CamelCase>Email</CamelCase>
+    <VisualStudioProjectId>00000000-0000-0000-0000-000000000000</VisualStudioProjectId>
+    <WrapperClass>MobileCrm.Model.ActivityListItem</WrapperClass>
+    <ClassBinding>
+      <SerializedClassBinding name="#DateLabel" label="DateLabel" type="String" />
+      <SerializedClassBinding name="#End" label="End" type="String" />
+      <SerializedClassBinding name="#Icon" label="Icon" type="String" />
+      <SerializedClassBinding name="#IsDirty" label="IsDirty" type="String" />
+      <SerializedClassBinding name="#Start" label="Start" type="String" />
+      <SerializedClassBinding name="#MailContacts" label="Contacts" type="String" />
+      <SerializedClassBinding name="#MailText" label="PreviewText" type="String" />
+      <SerializedClassBinding name="#SubjectRead" label="SubjectRead" type="String" />
+      <SerializedClassBinding name="#SubjectUnread" label="SubjectUnread" type="String" />
+      <SerializedClassBinding name="#ImageUnread" label="ImageUnread" type="String" />
+      <SerializedClassBinding name="#IsRead" label="IsRead" type="Boolean" />
+      <SerializedClassBinding name="#Summary" label="Summary" type="String" />
+      <SerializedClassBinding name="#ShortDate" label="ShortDate" type="String" />
+      <SerializedClassBinding name="#ShortLabel" label="ShortLabel" type="String" />
+      <SerializedClassBinding name="#EmailFlags" label="EmailFlags" type="Integer" />
+      <SerializedClassBinding name="#HasAttachments" label="HasAttachments" type="Boolean" />
+      <SerializedClassBinding name="#IsTracked" label="IsTracked" type="Boolean" />
+      <SerializedClassBinding name="#AttachmentImage" label="AttachmentImage" type="String" />
+      <SerializedClassBinding name="#StatusImage" label="StatusImage" type="String" />
+    </ClassBinding>
+  </Attributes>
+  <ComponentId>00000000-0000-0000-0000-000000000000</ComponentId>
+  <Name>Now</Name>
+  <Kind>List</Kind>
+  <IsDefault>false</IsDefault>
+  <IsHidden>true</IsHidden>
+  <Fetch version="1.0">
+    <entity name="email" />
+  </Fetch>
+  <OrderBy>!createdon</OrderBy>
+  <SerializedBindings>
+    <string>statecode</string>
+    <string>createdon</string>
+    <string>description</string>
+    <string>directioncode</string>
+    <string>scheduledend</string>
+    <string>activityid</string>
+    <string>from</string>
+    <string>ownerid</string>
+    <string>regardingobjectid</string>
+    <string>scheduledstart</string>
+    <string>statuscode</string>
+    <string>subject</string>
+    <string>to</string>
+  </SerializedBindings>
+  <SerializedTemplates>
+    <RowTemplate>
+      <DesignWidth>320</DesignWidth>
+      <DesignHeight>48</DesignHeight>
+      <Name>Default</Name>
+      <Width>320</Width>
+      <Height>68</Height>
+      <SerializedBackground>0</SerializedBackground>
+      <SerializedSelectedBackground>0</SerializedSelectedBackground>
+      <SerializedChildren>
+        <CellTemplate SchemaName="#MailContacts">
+          <IsConstant>false</IsConstant>
+          <StyleName>H10</StyleName>
+          <Bounds>64,6,192,20</Bounds>
+          <CellKind>0</CellKind>
+          <Anchor>13</Anchor>
+        </CellTemplate>
+        <CellTemplate SchemaName="#Icon">
+          <IsConstant>false</IsConstant>
+          <StyleName>EmailImage</StyleName>
+          <Bounds>8,8,40,40</Bounds>
+          <CellKind>1</CellKind>
+          <Anchor>7</Anchor>
+        </CellTemplate>
+        <CellTemplate SchemaName="#DateLabel">
+          <IsConstant>false</IsConstant>
+          <StyleName>r_gray_day</StyleName>
+          <Bounds>256,8,56,18</Bounds>
+          <CellKind>0</CellKind>
+          <Anchor>13</Anchor>
+        </CellTemplate>
+        <CellTemplate SchemaName="#MailText">
+          <IsConstant>false</IsConstant>
+          <StyleName>gray</StyleName>
+          <Bounds>64,24,248,38</Bounds>
+          <CellKind>0</CellKind>
+          <Anchor>13</Anchor>
+        </CellTemplate>
+        <CellTemplate SchemaName="statecode">
+          <IsConstant>false</IsConstant>
+          <StyleName>EmailStatus</StyleName>
+          <Bounds>8,50,40,11</Bounds>
+          <CellKind>0</CellKind>
+          <Anchor>5</Anchor>
+        </CellTemplate>
+      </SerializedChildren>
+    </RowTemplate>
+  </SerializedTemplates>
+  <CustomProperties />
+  <SerializedChildren />
+  <Height>40</Height>
+</EntityList>

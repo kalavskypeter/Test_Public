@@ -1,0 +1,20 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Dashboard xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <Columns>2</Columns>
+  <Rows>2</Rows>
+  <Items>
+    <DashboardComponent xsi:type="DashboardEntityComponent" Kind="Chart" Binding="salesorder" Options="0">
+      <Bounds>0,0,1,1</Bounds>
+    </DashboardComponent>
+    <DashboardComponent xsi:type="DashboardEntityComponent" Kind="Chart" Binding="opportunity;opportunity.Sales Pipeline" Options="3">
+      <Bounds>0,1,1,1</Bounds>
+    </DashboardComponent>
+    <DashboardComponent xsi:type="DashboardEntityComponent" Kind="List" Binding="lead" Options="3">
+      <Bounds>1,1,1,1</Bounds>
+    </DashboardComponent>
+    <DashboardComponent xsi:type="DashboardEntityComponent" Kind="List" Binding="appointment;&lt;extra&gt;&lt;actions&gt;99;;1&lt;/actions&gt;&lt;calendar&gt;&lt;MinDate p3:nil=&quot;true&quot; xmlns:p3=&quot;http://www.w3.org/2001/XMLSchema-instance&quot; /&gt;&lt;MaxDate p3:nil=&quot;true&quot; xmlns:p3=&quot;http://www.w3.org/2001/XMLSchema-instance&quot; /&gt;&lt;BusinessDaysMask&gt;127&lt;/BusinessDaysMask&gt;&lt;ViewsMask&gt;14&lt;/ViewsMask&gt;&lt;/calendar&gt;&lt;/extra&gt;" Options="3">
+      <LegacyConfig>appointment</LegacyConfig>
+      <Bounds>1,0,1,1</Bounds>
+    </DashboardComponent>
+  </Items>
+</Dashboard>
