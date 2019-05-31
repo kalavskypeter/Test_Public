@@ -1,0 +1,680 @@
+﻿<!DOCTYPE html>
+
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="utf-8" />
+    <title>Empty Offline HTML page</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="initial-scale=1, user-scalable=no" />
+    <script src="..\Common\JSBridge.js"></script>
+    <script src="..\Common\pe_GlobalCommonFunctions.js"></script>
+    <script src="..\Common\jquery-3.3.1.min.js"></script>
+    <script src="..\Common\popper.min.js"></script>
+    <script src="..\Common\bootstrap.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="..\Common\bootstrap.min.css">
+</head>
+<body>
+
+    <div class="container mt-2">
+        <div class="row">
+            <div class="col">
+                <button id="btnComplete" class="btn btn-primary btn-block" onclick="CampaignExecution.OnClick_Complete();">Completed</button>
+            </div>
+        </div>
+    </div>
+    <label id="logLabel"></label>
+    <script>
+
+        //*****************************************************************************************************************************************************
+        //Task 5076 |
+        //----------
+        //Form v Resco.
+        //entita: pe_campaignexecution
+
+        //Pokud se uklada zmena Status Reason = Completed = 100 000 000, vyplnit pole "pe_completedon" aktualnim casem. I v pripade, ze je pole jiz naplnene.
+
+        //Pokud se uklada zmena Status Reason = Active = 1 pole pe_completedon se vymaze.
+        //Pokud se uklada zmena Status Reason = Inactive = 2, pole pe_completedon se vymaze.
+        //*****************************************************************************************************************************************************
+        //Task 5102 |
+        //----------
+        //potreboval bych udelat opet programove quick view z entity, vlozit do Resca hned pod pole Campaign nad rozdelovnik:
+        //na entite: pe_campaignexecution
+        //a pres jeji lookup pe_campaignid na Campaign
+        //Z kampane potrebuji zobrazit:
+        //pe_campaignid.pe_promotiontype
+        //pe_campaignid.description
+        //pe_campaignid.pe_desctriptionofexposures
+        //*****************************************************************************************************************************************************
+        //Task 5044 |
+        //----------
+        //potreboval bych nastavit form v Resco pro:
+        //Campaign Execution
+
+        //## tohle nevim, zda umime udelat - povinna sekce?
+        //pokud pe_picturerequired = true (nebude videt v Rescu, nastavuje se v CRM, na form v Rescu tedy nebude)
+        //je potreba, aby uzivatel pokud je tento attb true neco vyfotil a pridal fotku, ale jak overit ze neco vyfotil? :)
+
+        //tyto pole nastavit jako viditelne a pouze pro cteni:
+        //pe_campaignid
+        //pe_name
+        //pe_promotype
+        //pe_completedon
+        //*****************************************************************************************************************************************************
+        //Task 5137 |
+        //----------
+        //v Resco
+        //---
+        //potreboval bych automaticky generovat radky (pe_campaignexecutionproduct) k entite Campaign Execution:
+        //    - generovani bude probihat po otevreni hlavicky = zaznamu entity pe_campaignexecution
+        //                    - pokud je pe_campaignexecution.pe_promotype == 100 000 002 (Price promo)
+        //                    - pokud je pe_campaignexecution.statuscode == 100 000 001 (draft)
+        //                    - pokud pe_campaignexecution.pe_rowsgeneratedon == null
+ 
+        //Vazba radek->hlavicka je pres
+        //pe_campaignexecutionproduct.pe_campaignexecutionid
+ 
+        //Jakmile dojde k vygenerovani radku:
+        //    -          nastavit statuscode = 1 (active)
+        //    -          pe_rowsgeneratedon = naplni se aktualnim datumem generovani radku
+ 
+        //pri generovani radku potrebuji naplnit hodnoty radku temito hodnotami:
+        //    pe_ campaignexecutionproduct.pe_campaignid = pe_campaignexecution.pe_campaignid
+        //----- prekopirovat vsechny radky Campaign product navazane na danou kampan do Campaign execution product -----
+        //-          vzit s z lookupu: pe_campaignexecution.pe_campaignid
+        //-          podivat se na entitu Campaign Product (pe_campaignproduct) a nacist si ty produkty, ktere maji:
+        //    o    campaignproduct pe_campaignid == pe_ campaignexecutionproduct.pe_campaignid
+        //pe_ campaignexecutionproduct.pe_productid = pe_campaignproduct.pe_productid
+        //pe_campaignexecutionproduct.pe_maximumprice = pe_campaignproduct.pe_maximumprice
+        //---------------------------------------------------
+        //pe_campaignexecutionproduct.pe_lastprice = "posledni campaign execution product.pe_actualprice"
+        //-zde si nacist posledni zaznam pe_campaignexecution, jeho enrollment (pe_campaignexectution.pe_enrollmentid), na enrollmentu si dohledat account (pe_accountid),
+        // pokud existuje a pro kazdou radku doplnit jeji cenu, provazani je pres guid produktu
+        //-pokud posledni zaznam neexistuje, nechat prazdne
+        //*****************************************************************************************************************************************************
+        //Task 5143 |
+        //----------
+        //CRM i Resco
+        //na entite: pe_campaignexecution
+        //bych potreboval dle picklistu: pe_promotype
+        //skryvat sekce
+        //kdyz je pe_promotype == 
+        //1) 100 000 001 (Promo Execution)
+        //a) CRM
+        //zobrazit sekci:  promoexecution
+        //skryt sekci: pricepromoadnpricecheck
+        //b) Resco
+        //skryt sekce: Price Promo and Price Check, Campaign Execution Products List
+
+        //2) 100 000 002 (Price Promo)
+        //a) CRM
+        //zobrazit sekci: pricepromoadnpricecheck
+        //skryt sekci: promoexecution
+        //b) Resco
+        //skryt sekce: Promo Execution
+
+        //PZA-ODV 6.3.2019:
+        //pokud nebude vybrána jedna z možností výše, skrýt obě sekce
+
+        var CampaignExecution = CampaignExecution || {
+            Enums: {
+                DisplayViewName: {
+                    General: "General"
+                },
+                StatusCode: {
+                    Completed: 1,
+                    Cancelled: 100000000,
+                    Draft: 100000001,
+                    Inactive: 2
+                },
+                CampaignExecutionProductStatusCode: {
+                    Active: 1,
+                    Draft: 100000000,
+                    Completed: 100000001,
+                    Inactive: 2
+                },
+                PromoType: {
+                    PromoPackageBOGOF: 100000000,
+                    PromoExecution: 100000001,
+                    PricePromo: 100000002,
+                    UnderCapPromo: 100000003
+                }
+            },
+            StatusCodeChanged: false,
+            PromotionTypeOptions: null,
+            LastCampaignExecution: null,
+            LastCampaignExecutionProducts: {},
+            AccountReference: null,
+            SetToCompleted: false,
+            ReadOnlyFields: ["pe_completedon", "pe_accountid", "pe_promotype", "pe_campaignid", "statuscode"],
+            SetCampaignDetailValues: function () {
+                try {
+                    var pe_campaignid = LLP.Common.Attribute_GetValue(CampaignExecution.Enums.DisplayViewName.General, "pe_campaignid");
+
+                    if (pe_campaignid) {
+                        var pe_campaign = MobileCRM.DynamicEntity.loadById(pe_campaignid.entityName, pe_campaignid.id,
+                            function (result) {
+                                MobileCRM.UI.EntityForm.requestObject(function (entityForm) {
+                                    LLP.SetExecutionContext(entityForm);
+                                    var addTextBox = false;
+                                    var textbox = LLP.Common.Attribute_Get(CampaignExecution.Enums.DisplayViewName.General, "campaigndetail");
+                                    if (!textbox) {
+                                        addTextBox = true;
+                                        textbox = new MobileCRM.UI.DetailViewItems.TextBoxItem("campaigndetail", "Campaign Detail");
+                                        textbox.isEnabled = false;
+                                        textbox.maxLength = 5000;
+                                        textbox.numberOfLines = 5;
+                                        textbox.style = "MultiLine";
+                                    }
+
+                                    textbox.value = "";
+                                    CampaignExecution.AddValueToMultiline(textbox, "Promotion type: ", CampaignExecution.GetPromotionTypeName(LLP.Common.GetAttributeValue(result, "pe_promotiontype")), false);
+                                    CampaignExecution.AddValueToMultiline(textbox, "Description: ", LLP.Common.GetAttributeValue(result, "description"), true);
+                                    CampaignExecution.AddValueToMultiline(textbox, "Desctription of Exposures: ", LLP.Common.GetAttributeValue(result, "pe_desctriptionofexposures"), true);
+
+                                    if (addTextBox) {
+                                        var detailView = entityForm.getDetailView(CampaignExecution.Enums.DisplayViewName.General);
+                                        var index = detailView.getItemIndex("pe_campaignid");
+                                        detailView.insertItem(textbox, index + 1);
+                                    }
+
+                                    var campaigndetail = LLP.Common.Attribute_Get(CampaignExecution.Enums.DisplayViewName.General, "campaigndetail");
+                                    if (campaigndetail) {
+                                        LLP.Common.Attribute_Visible(CampaignExecution.Enums.DisplayViewName.General, "campaigndetail");
+                                    }
+                                },
+                                function (error) {
+                                    LLP.LOG.Error(LLP.Enums.Module.CampaignExecution, "SetCampaignDetailValues -> MobileCRM.UI.EntityForm.requestObject:", error);
+                                }, null);
+
+                            },
+                            function (error) {
+                                LLP.LOG.Error(LLP.Enums.Module.CampaignExecution, "SetCampaignDetailValues -> load account MobileCRM.DynamicEntity.loadById (" + pe_accountid.id + "):", error);
+                            }, null);
+                    }
+                    else {
+                        var textbox = LLP.Common.Attribute_Get(CampaignExecution.Enums.DisplayViewName.General, "campaigndetail");
+                        if (textbox) {
+                            LLP.Common.Attribute_Invisible(CampaignExecution.Enums.DisplayViewName.General, "campaigndetail");
+                        }
+                    }
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.CampaignExecution, "SetCampaignDetailValues:", e);
+                }
+            },
+            AddValueToMultiline: function (control, text, value, newLine, textIsDelimiter) {
+
+                if (!control.value) {
+                    control.value = "";
+                }
+
+                if (newLine) {
+                    control.value += "\n";
+                }
+
+                if (!textIsDelimiter) {
+                    control.value += text;
+                }
+
+                if (value && textIsDelimiter) {
+                    control.value += text + value;
+                }
+                else if (value) {
+                    control.value += value;
+                }
+            },
+            RetrievePromotionTypeOptions: function (callback) {
+                try {
+                    MobileCRM.Metadata.getOptionSetValues(
+                                        "campaign",
+                                        "pe_promotiontype",
+                                        function (optionSetValues) {
+                                            CampaignExecution.PromotionTypeOptions = optionSetValues;
+                                            callback();
+                                        },
+                                        function (error) {
+                                            LLP.LOG.Error(LLP.Enums.Module.CampaignExecution, "FilterStatusCodes -> MobileCRM.Metadata.getOptionSetValues callback:", error);
+                                        }, null);
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.CampaignExecution, "RetrievePromotionTypeOptions:", e);
+                }
+            },
+            GetPromotionTypeName: function (promotionTypeValue) {
+                try {
+                    if(CampaignExecution.PromotionTypeOptions != null) {
+                        var names = Object.getOwnPropertyNames(CampaignExecution.PromotionTypeOptions);
+                        for (var i = 0; i < names.length; i++) {
+                            if (CampaignExecution.PromotionTypeOptions[names[i]] == promotionTypeValue) {
+                                return names[i];
+                            }
+                        }
+                    }
+
+                    return null;
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.CampaignExecution, "GetPromotionTypeName:", e);
+                }
+            },
+            CheckCanGenerateLines: function (entityForm) {
+                try {
+                    var pe_promotype = LLP.Common.GetAttributeValue(entityForm.entity, "pe_promotype");
+                    var statuscode = LLP.Common.GetAttributeValue(entityForm.entity, "statuscode");
+                    var pe_rowsgeneratedon = LLP.Common.GetAttributeValue(entityForm.entity, "pe_rowsgeneratedon");
+
+                    if (pe_promotype == CampaignExecution.Enums.PromoType.PricePromo && statuscode == CampaignExecution.Enums.StatusCode.Draft && !pe_rowsgeneratedon) {
+                        CampaignExecution.GetDataForGeneratingLines(entityForm, CampaignExecution.CreateCampaignExecutionProductLines);
+                    }
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.CampaignExecution, "CheckCanGenerateLines:", e);
+                }
+            },
+            GetDataForGeneratingLines: function (entityForm, createLinesCallback) {
+
+                try {
+
+                    CampaignExecution.GetLastCampaignExecution(entityForm.entity, function () {
+
+                        MobileCRM.UI.EntityForm.requestObject(function (entityForm) {
+
+                            var pe_campaignid = LLP.Common.GetAttributeValue(entityForm.entity, "pe_campaignid");
+
+                            if (!pe_campaignid) {
+                                return;
+                            }
+
+                            var xml =
+                                '<fetch>\
+		                            <entity name="pe_campaignproduct">\
+                                        <attribute name="pe_name" />\
+                                        <attribute name="pe_campaignid" />\
+                                        <attribute name="pe_productid" />\
+                                        <attribute name="pe_maximumprice" />\
+		                                <filter type="and">\
+			                                <condition attribute="pe_campaignid" operator="eq" value="' + pe_campaignid.id + '" />\
+		                                </filter>\
+		                            </entity>\
+	                            </fetch>';
+
+                            MobileCRM.FetchXml.Fetch.deserializeFromXml(xml, function (fetch) {
+                                fetch.execute("DynamicEntities", function (result) {
+                                    createLinesCallback(entityForm, result);
+                                }, MobileCRM.bridge.alert);
+                            }, MobileCRM.bridge.alert);
+                        },
+                        function (error) {
+                            LLP.LOG.Error(LLP.Enums.Module.CampaignExecution, "GetDataForGeneratingLines -> MobileCRM.UI.EntityForm.requestObject:", error);
+                        }, null);
+                    });
+                } catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.CampaignExecution, "CreateInventoryCheckLines: ", e);
+                }
+            },
+            GetLastCampaignExecution: function (entity, callback) {
+                try {
+
+                    CampaignExecution.LastCampaignExecution = null;
+                    var pe_enrollmentid = LLP.Common.GetAttributeValue(entity, "pe_enrollmentid");
+
+                    if (!CampaignExecution.AccountReference) {
+                        callback();
+                        return;
+                    }
+
+                    var fetchLastCampaignExecution =
+                        '<fetch>\
+		                        <entity name="pe_campaignexecution">\
+                                    <attribute name="pe_campaignexecutionid" />\
+                                    <attribute name="pe_enrollmentid" />\
+                                    <order attribute="createdon" descending="true" />\
+                                    <link-entity name="pe_enrollment" from="pe_enrollmentid" to="pe_enrollmentid" alias="pe_enrollment" >\
+                                        <attribute name="pe_accountid" />\
+                                        <filter type="and">\
+			                                <condition attribute="pe_accountid" operator="eq" value="' + CampaignExecution.AccountReference.id + '" />\
+		                                </filter>\
+                                    </link-entity>\
+		                        </entity>\
+	                        </fetch>';
+
+                    MobileCRM.FetchXml.Fetch.deserializeFromXml(fetchLastCampaignExecution, function (fetch) {
+                        fetch.execute("DynamicEntities", function (result) {
+                            if (result.length > 0) {
+                                
+                                for (var i = 0; i < result.length; i++) {
+                                    if (LLP.Common.GetAttributeValue(result[i], "pe_campaignexecutionid") != entity.id) {
+                                        var accountId = LLP.Common.GetAttributeValue(result[i], "pe_enrollment.pe_accountid");
+                                        if (accountId && accountId.id == CampaignExecution.AccountReference.id) {
+                                            CampaignExecution.LastCampaignExecution = result[i];
+
+                                            var fetchLastCampaignExecutionProducts =
+                                            '<fetch>\
+		                                        <entity name="pe_campaignexecutionproduct">\
+                                                    <attribute name="pe_campaignexecutionproductid" />\
+                                                    <attribute name="pe_productid" />\
+                                                    <attribute name="pe_actualprice" />\
+                                                    <filter type="and">\
+			                                            <condition attribute="pe_campaignexecutionid" operator="eq" value="' + CampaignExecution.LastCampaignExecution.id + '" />\
+		                                            </filter>\
+		                                        </entity>\
+	                                        </fetch>';
+
+                                            MobileCRM.FetchXml.Fetch.deserializeFromXml(fetchLastCampaignExecutionProducts, function (fetch) {
+                                                fetch.execute("DynamicEntities", function (execProducts) {
+                                                    for (var i = 0; i < execProducts.length; i++) {
+                                                        CampaignExecution.LastCampaignExecutionProducts[LLP.Common.GetAttributeValue(execProducts[i], "pe_productid").id] = execProducts[i];
+                                                    }
+
+                                                    callback();
+                                                }, MobileCRM.bridge.alert);
+                                            }, MobileCRM.bridge.alert);
+                                            break;
+                                        }
+                                    }
+                                }
+
+                                if (!CampaignExecution.LastCampaignExecution) {
+                                    callback();
+                                }
+                            }
+                        }, MobileCRM.bridge.alert);
+                    },
+                    function (error) {
+                        LLP.LOG.Error(LLP.Enums.Module.CampaignExecution, "GetLastCampaignExecution -> fetch: ", error);
+                    }, null);
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.CampaignExecution, "GetLastCampaignExecution: ", e);
+                }
+            },
+            GetAccountFromEntrollment: function(entity, callback) {
+                try {
+                    CampaignExecution.AccountReference = null;
+                    var pe_enrollmentid = LLP.Common.GetAttributeValue(entity, "pe_enrollmentid");
+                    if (pe_enrollmentid) {
+                        MobileCRM.DynamicEntity.loadById(pe_enrollmentid.entityName, pe_enrollmentid.id,
+                            function (pe_enrollment) {
+                                CampaignExecution.AccountReference = LLP.Common.GetAttributeValue(pe_enrollment, "pe_accountid");
+                                callback();
+                            },
+                            function (error) {
+                                LLP.LOG.Error(LLP.Enums.Module.CampaignExecution, "GetAccountFromEntrollment -> load pe_enrollment error: ", error);
+                                callback();
+                            })
+                    }
+                    else {
+                        callback();
+                    }
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.CampaignExecution, "GetAccountFromEntrollment: ", e);
+                }
+            },
+            CreateCampaignExecutionProductLines : function(entityForm, entities) {
+                try {
+
+                    var results = [];
+
+                    for (var i = 0; i < entities.length; i++) {
+
+                        try {
+                            var pe_productid = LLP.Common.GetAttributeValue(entities[i], "pe_productid");
+                            var pe_campaignexecutionproduct = new MobileCRM.DynamicEntity.createNew("pe_campaignexecutionproduct");
+                            LLP.Common.SetAttributeValue(pe_campaignexecutionproduct, "pe_name", LLP.Common.GetAttributeValue(entities[i], "pe_name"));
+                            LLP.Common.SetAttributeValue(pe_campaignexecutionproduct, "pe_campaignid", LLP.Common.GetAttributeValue(entities[i], "pe_campaignid"));
+                            LLP.Common.SetAttributeValue(pe_campaignexecutionproduct, "pe_campaignexecutionid", new MobileCRM.Reference(entityForm.entity.entityName, entityForm.entity.id, entityForm.entity.primaryName));
+                            LLP.Common.SetAttributeValue(pe_campaignexecutionproduct, "pe_productid", pe_productid);
+                            LLP.Common.SetAttributeValue(pe_campaignexecutionproduct, "pe_maximumprice", LLP.Common.GetAttributeValue(entities[i], "pe_maximumprice"));
+
+                            var lastCampaignExecutionProduct = CampaignExecution.LastCampaignExecutionProducts[pe_productid.id];
+                            if (lastCampaignExecutionProduct) {
+                                LLP.Common.SetAttributeValue(pe_campaignexecutionproduct, "pe_lastprice", LLP.Common.GetAttributeValue(lastCampaignExecutionProduct, "pe_actualprice"));
+                            }
+
+                            pe_campaignexecutionproduct.save(
+                                function (err) {
+                                    if (err) {
+                                        LLP.LOG.Error(LLP.Enums.Module.CampaignExecution, "CreateCampaignExecutionProductLines -> callback: ", err);
+                                        results.push(false);
+                                    }
+                                    else {
+                                        results.push(true);
+                                    }
+
+                                    if (results.length == entities.length) {
+                                        if (results.indexOf(false) < 0) {
+                                            MobileCRM.UI.EntityForm.requestObject(function (entityForm) {
+                                                LLP.Common.SetAttributeValue(entityForm.entity, "pe_rowsgeneratedon", new Date());                                                
+                                                MobileCRM.UI.EntityForm.save();
+                                            },
+                                            function (error) {
+
+                                            }, null);
+                                        }
+                                        else {
+                                            MobileCRM.bridge.alert("Some error occured during generating Campaign Execution Products");
+                                        }
+                                    }
+                                }
+                            );
+                        }
+                        catch (e) {
+                            error = true;
+                        }
+                    }
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.CampaignExecution, "CreateCampaignExecutionProductLines: ", e);
+                }
+            },
+            SetTabsVisibility: function (entityForm) {
+                try {
+                    let statuscode = LLP.Common.GetAttributeValue(entityForm.entity, "statuscode");
+
+                    var promoExecutionTabVisibile = false;
+                    var pricePromoAndPriceCheckVisible = false;
+                    var campaignExecutionProductsListVisible = false;
+
+                    var pe_promotype = LLP.Common.Attribute_GetValue(CampaignExecution.Enums.DisplayViewName.General, "pe_promotype");
+                    LLP.Common.Attribute_Visibility(CampaignExecution.Enums.DisplayViewName.General, "pe_promoexecutionresult", pe_promotype == CampaignExecution.Enums.PromoType.PromoExecution);
+
+                    if (LLP.Form.IsCreate()) {
+                        entityForm.setTabVisibility("Price Promo and Price Check", false);
+                        entityForm.setTabVisibility("Picture", false);
+                        entityForm.setTabVisibility("Promo Execution", false);
+                    }
+                    else {
+                        switch (pe_promotype) {
+                            case CampaignExecution.Enums.PromoType.PromoExecution:
+                                promoExecutionTabVisibile = true;
+                                pricePromoAndPriceCheckVisible = false;
+                                campaignExecutionProductsListVisible = false;
+                                break;
+                            case CampaignExecution.Enums.PromoType.PricePromo:
+                                promoExecutionTabVisibile = false;
+                                pricePromoAndPriceCheckVisible = true;
+                            default:
+                                campaignExecutionProductsListVisible = true;
+                                break;
+                        }
+
+                        entityForm.setTabVisibility("Promo Execution", promoExecutionTabVisibile);
+                        entityForm.setTabVisibility("Price Promo and Price Check", pricePromoAndPriceCheckVisible);
+                        entityForm.setTabVisibility("pe_campaignexecutionproduct.pe_campaignexecutionid.pe_campaignexecution", campaignExecutionProductsListVisible);
+                    }
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.CampaignExecution, "SetTabsVisibility: ", e);
+                }
+            },
+            SetEditability: function (entityForm) {
+
+                try {
+                    var statuscode = LLP.Common.Attribute_GetValue(CampaignExecution.Enums.DisplayViewName.General, "statuscode");
+                    var disabled = statuscode == CampaignExecution.Enums.StatusCode.Completed;
+                    LLP.HtmlControl.SetDisabled("btnComplete", disabled);
+                    LLP.Common.Attribute_Disabled(CampaignExecution.Enums.DisplayViewName.General, "statuscode");
+                    LLP.Common.Attribute_Invisible(CampaignExecution.Enums.DisplayViewName.General, "pe_name");
+
+                    for (let i = 0; i < CampaignExecution.ReadOnlyFields.length; i++) {
+                        LLP.Common.Attribute_IsDisabled(CampaignExecution.Enums.DisplayViewName.General, CampaignExecution.ReadOnlyFields[i], true);
+                    }
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.CampaignExecution, "SetEditability", e);
+                }
+            },
+            SetCompleted: function () {                
+                LLP.Common.Attribute_SetValue(CampaignExecution.Enums.DisplayViewName.General, "statuscode", CampaignExecution.Enums.StatusCode.Completed);
+            },
+            DoComplete: function() {
+                try {
+                    MobileCRM.UI.EntityForm.requestObject(function(entityForm) {
+                        LLP.SetExecutionContext(entityForm);
+                        CampaignExecution.SetToCompleted = true;
+
+                        if (!entityForm.isDirty) {
+                            CampaignExecution.SetCompleted();
+                        }
+
+                        MobileCRM.UI.EntityForm.save();
+                    },
+                    function(error) {
+                        LLP.LOG.Error(LLP.Enums.Module.CampaignExecution, "DoComplete -> MobileCRM.UI.EntityForm.requestObject", error);
+                    }, null);
+                }
+                catch(e) {
+                    LLP.LOG.Error(LLP.Enums.Module.CampaignExecution, "DoComplete", error);
+                }
+            },
+            OnClick_Complete: function() {
+                try {
+                    MobileCRM.UI.EntityForm.requestObject(function (entityForm) {
+                        LLP.SetExecutionContext(entityForm);
+
+                        let pe_numberoffailures = LLP.Common.GetAttributeValue(entityForm.entity, "pe_numberoffailures");
+
+                        if (pe_numberoffailures > 0) {
+                            MobileCRM.bridge.alert("Please, fill in all rows of Campaign Exectution");
+                            return;
+                        }
+                        else {
+                            CampaignExecution.DoComplete();
+                        }
+                    },
+                    function (error) {
+                        LLP.LOG.Error(LLP.Enums.Module.CampaignExecution, "OnClick_Complete -> MobileCRM.UI.EntityForm.requestObject", error);
+                    }, null);
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.CampaignExecution, "OnClick_Complete", e);
+                }
+            },
+            OnChange_StatusCode: function (entityForm) {
+                try {
+                    CampaignExecution.StatusCodeChanged = true;
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.CampaignExecution, "OnChange_StatusCode: ", e);
+                }
+            },
+            OnChange_PromoType: function(entityForm) {
+                try {
+                    LLP.SetExecutionContext(entityForm);
+                    CampaignExecution.SetTabsVisibility(entityForm);
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.CampaignExecution, "OnChange_PromoType: ", e);
+                }
+            },
+            OnChange_Campaign: function(entityForm) {
+                LLP.SetExecutionContext(entityForm);
+                CampaignExecution.SetCampaignDetailValues();
+            },
+            OnLoad: function () {
+                try {
+                    MobileCRM.UI.EntityForm.onItemChange("statuscode", CampaignExecution.OnChange_StatusCode, true, null);
+                    MobileCRM.UI.EntityForm.onItemChange("pe_promotype", CampaignExecution.OnChange_PromoType, true, null);
+                    MobileCRM.UI.EntityForm.onItemChange("pe_campaignid", CampaignExecution.OnChange_Campaign, true, null);
+                    MobileCRM.UI.EntityForm.onSave(CampaignExecution.OnSave, true, null);
+
+                    CampaignExecution.RetrievePromotionTypeOptions(function () {
+                        MobileCRM.UI.EntityForm.requestObject(function (entityForm) {
+                            
+                            LLP.SetExecutionContext(entityForm);
+                            
+                            CampaignExecution.SetCampaignDetailValues();
+                            CampaignExecution.SetTabsVisibility(entityForm);
+                            CampaignExecution.SetEditability(entityForm);
+                            
+                            LLP.Common.Attribute_Visible(CampaignExecution.Enums.DisplayViewName.General, "pe_campaignid");
+                            LLP.Common.Attribute_Visible(CampaignExecution.Enums.DisplayViewName.General, "pe_name");
+                            LLP.Common.Attribute_Visible(CampaignExecution.Enums.DisplayViewName.General, "pe_promotype");
+                            LLP.Common.Attribute_Visible(CampaignExecution.Enums.DisplayViewName.General, "pe_completedon");
+
+                            CampaignExecution.GetAccountFromEntrollment(entityForm.entity, function () {
+                                MobileCRM.UI.EntityForm.requestObject(function (entityForm) {
+                                    CampaignExecution.CheckCanGenerateLines(entityForm);
+                                },
+                                function (error) {
+                                    LLP.LOG.Error(LLP.Enums.Module.CampaignExecution, "OnLoad -> CampaignExecution.GetAccountFromEntrollment callback: ", error, entityForm.entity);
+                                }, null);
+                            });
+
+                            //K tasku 5044 - vyzkum
+                            //var media = entityForm.getMediaTab("Picture");
+                            //media.setCommandsMask(LLP.Enums.DocumentAction.CapturePhoto | LLP.Enums.DocumentAction.SelectFile | LLP.Enums.DocumentAction.Clear, MobileCRM.bridge.alert);
+                            //media.getDocumentInfo(function (document) {
+                            //    var fileSize = document.documentInfo.fileSize;
+                            //},
+                            //function (error) {
+
+                            //}, null)
+                            //media.selectPhoto();
+                            //media.capturePhoto();
+                        });
+                    },
+                    function (error) {
+                        LLP.LOG.Error(LLP.Enums.Module.CampaignExecution, "OnLoad -> CampaignExecution.RetrievePromotionTypeOptions: ", error);
+                    }, null)
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.CampaignExecution, "OnLoad: ", e);
+                }
+            },
+            OnSave: function (entityForm) {
+                try {
+                    LLP.SetExecutionContext(entityForm);
+
+                    if (CampaignExecution.SetToCompleted) {
+                        CampaignExecution.SetCompleted();
+                        LLP.Common.Attribute_SetValue(CampaignExecution.Enums.DisplayViewName.General, "pe_completedon", new Date());
+                    }
+
+                    if (CampaignExecution.StatusCodeChanged) {
+                        var statuscode = LLP.Common.Attribute_GetValue(CampaignExecution.Enums.DisplayViewName.General, "statuscode");
+                        switch (statuscode) {
+                            case CampaignExecution.Enums.StatusCode.Completed:
+                                LLP.Common.Attribute_SetValue(CampaignExecution.Enums.DisplayViewName.General, "pe_completedon", new Date());
+                                break;
+                            default:
+                                LLP.Common.Attribute_SetValue(CampaignExecution.Enums.DisplayViewName.General, "pe_completedon", null);
+                                break;
+                        }
+                    }
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.CampaignExecution, "OnSave: ", e);
+                }
+            }
+        }
+
+        window.onload = function () {
+            CampaignExecution.OnLoad();
+        }
+
+    </script>
+</body>
+</html>

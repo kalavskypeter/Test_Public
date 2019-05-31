@@ -1,0 +1,123 @@
+﻿<!DOCTYPE html>
+
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="utf-8" />
+    <title>Empty Offline HTML page</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="initial-scale=1, user-scalable=no" />
+    <script src="..\Common\JSBridge.js"></script>
+    <script src="..\Common\pe_GlobalCommonFunctions.js"></script>
+    <script src="..\Common\jquery-3.3.1.min.js"></script>
+    <script src="..\Common\popper.min.js"></script>
+    <script src="..\Common\bootstrap.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="..\Common\bootstrap.min.css">
+</head>
+<body>
+
+    <div class="container mt-2">
+        <div class="row">
+            <div class="col">
+                <button id="btnComplete" class="btn btn-primary btn-block" onclick="CollectionofCap.OnClick_Complete();">Completed</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        
+        //Task 5270 |
+        //----------
+        //Resco
+        //---
+        //entita: pe_collectionofcaps
+        //---
+        //a) vytvorit tlacitko "Completed"
+        //- tlacitko je aktivni pouze pokud statuscode=100,000,000 (Draft), pokud statuscode=1 nebo 2 je neaktivni
+        //- tlactitko bude nastavovat statuscode=1 (collected from customer)
+        //b) nastavit statuscode vzdy pro cteni
+        //c) pokud statuscode != 100,000,000 (Draft) nastavit tyto pole pro cteni:
+        //pe_account
+        //pe_name
+
+        var CollectionofCap = CollectionofCap || {
+            Enums: {
+                // Detail view display name
+                DisplayViewName: {
+                    General: "General"
+                },
+                StatusCode: {
+                    CollectedfromCustomer: 1,
+                    Draft: 100000000,
+                    Inactive: 2
+                }
+            },
+            SetToCompleted: false,
+            SetEditability: function () {
+                try {
+                    LLP.Common.Attribute_Disabled(CollectionofCap.Enums.DisplayViewName.General, "statuscode");
+                    var statuscode = LLP.Common.Attribute_GetValue(CollectionofCap.Enums.DisplayViewName.General, "statuscode");
+                    var disabled = statuscode != CollectionofCap.Enums.StatusCode.Draft;
+                    LLP.HtmlControl.SetDisabled("btnComplete", disabled);
+                    LLP.Common.Attribute_IsDisabled(CollectionofCap.Enums.DisplayViewName.General, "pe_account", disabled);
+                    LLP.Common.Attribute_IsDisabled(CollectionofCap.Enums.DisplayViewName.General, "pe_name", disabled);
+                    LLP.Common.Attribute_Disabled(CollectionofCap.Enums.DisplayViewName.General, "pe_accountid");
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.CollectionofCap, "SetEditability ", e);
+                }
+            },
+            SetCompleted: function() {
+                LLP.Common.Attribute_SetValue(CollectionofCap.Enums.DisplayViewName.General, "statuscode", CollectionofCap.Enums.StatusCode.CollectedfromCustomer);
+            },
+            OnClick_Complete: function() {
+                try {
+                    MobileCRM.UI.EntityForm.requestObject(function (entityForm) {
+                        LLP.SetExecutionContext(entityForm);
+                        CollectionofCap.SetToCompleted = true;
+                        if (!entityForm.isDirty) {
+                            CollectionofCap.SetCompleted();
+                        }
+                        MobileCRM.UI.EntityForm.save();
+                    },
+                    function (error) {
+                        LLP.LOG.Error(LLP.Enums.Module.CollectionofCap, "OnClick_Complete -> MobileCRM.UI.EntityForm.requestObject", error);
+                    }, null)
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.CollectionofCap, "OnClick_Complete", e);
+                }
+            },
+            OnLoad: function () {
+                try
+                {
+                    MobileCRM.UI.EntityForm.onSave(CollectionofCap.OnSave, true, null);
+                    MobileCRM.UI.EntityForm.requestObject(function (entityForm) {
+                        LLP.SetExecutionContext(entityForm);
+                        CollectionofCap.SetEditability();
+                        
+                    });
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.CollectionofCap, "OnLoad: ", e);
+                }
+            },
+            OnSave: function (entityForm) {
+                try {
+                    if (CollectionofCap.SetToCompleted) {
+                        LLP.SetExecutionContext(entityForm);
+                        CollectionofCap.SetCompleted();
+                    }
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.CollectionofCap, "OnSave: ", e);
+                }
+            }
+        }
+
+        window.onload = function () {
+            CollectionofCap.OnLoad();
+        }
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,57 @@
+﻿<!DOCTYPE html>
+
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="utf-8" />
+    <title>Empty Offline HTML page</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="initial-scale=1, user-scalable=no" />
+    <script src="..\Common\JSBridge.js"></script>
+    <script src="..\Common\pe_GlobalCommonFunctions.js"></script>
+</head>
+<body>
+    <script>
+
+        var OrderProductAllProductsRowCommon = OrderProductAllProductsRowCommon || {
+            Enums: {
+                OrderStatusCode: {
+                    Completed: 690970001
+                }
+            },
+            CheckOrderStatusCode: function(statusCode) {
+                try {
+                    if (statusCode == OrderProductAllProductsRowCommon.Enums.OrderStatusCode.Completed) {
+                        MobileCRM.UI.EntityList.selectView("Order Products – All Products – ReadOnly");
+                    }
+                    else {
+                        MobileCRM.UI.EntityList.selectView("Order Products – All Products");
+                    }
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.OrderProductAllProductsRowCommon, "CheckOrderStatusCode", e);
+                }
+            },
+            OnLoad: function () {
+                try
+                {
+                    MobileCRM.UI.EntityList.requestObject(function (entityList) {
+                        var statucode = LLP.Common.GetAttributeValue(entityList.relationship.target, "statuscode");
+                        OrderProductAllProductsRowCommon.CheckOrderStatusCode(statucode);
+                    },
+                    function (error) {
+                        LLP.LOG.Error(LLP.Enums.Module.OrderProductAllProductsRowCommon, "OnLoad -> MobileCRM.UI.EntityList.requestObject", error);
+                    }, null);
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.OrderProductAllProductsRowCommon, "OnLoad", e);
+                }
+            }
+        }
+
+        window.onload = function () {
+            OrderProductAllProductsRowCommon.OnLoad();
+        }
+
+    </script>
+</body>
+</html>

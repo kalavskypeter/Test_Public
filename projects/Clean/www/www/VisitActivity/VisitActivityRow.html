@@ -1,0 +1,305 @@
+﻿<!DOCTYPE html>
+
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="utf-8" />
+    <title>Empty Offline HTML page</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="initial-scale=1, user-scalable=no" />
+    <script src="..\Common\JSBridge.js"></script>
+    <script src="..\Common\pe_GlobalCommonFunctions.js"></script>
+</head>
+<body>
+    <script>
+        var pe_visitactivity = null;
+
+        var VisitActivityRow = VisitActivityRow || {
+            Enums: {
+                DisplayViewName: {
+                    General: "General"
+                }
+
+
+            },
+            eActivityType:
+                {
+                    Order: 100000000,                       // pe_orderid               create on CRM full
+                    MASegmentTTandMT: 100000001,            // pe_masegmentationttmtid  create on resco
+                    Survey: 100000002,                      // pe_surveryid             create on CRM template
+                    TableSurvey: 100000003,                 // pe_tablesurveyid        create on CRM template
+                    Task: 100000004,                        // pe_taskid                 create on CRM full
+                    CampaignExecutionPromo: 100000005,      // pe_campaignexecutionid    create on CRM full
+                    CampaignExecutionPrice: 100000006,      // pe_campaignexecutionid    create on CRM full
+                    ContractMonitoring: 100000007,          // pe_contractmonitoringid   create on CRM full
+                    InventoryCheck: 100000008,              // pe_inventorycheckid       create on crm full
+                    MAOtherOFF: 100000010,                  // pe_maotheroffid          create on resco
+                    MAOtherON: 100000011,                   // pe_maotheronid            create on resco
+                    MASegmentationON: 100000012,            // pe_masegmentationonid     create on resco
+                    MAServiceON: 100000013,                 // pe_maserviceonid         create on resco
+
+                },
+
+
+            OnClick: function(entityList) {
+                try {
+                    var context = entityList.context;
+
+
+                    if (context.entities.length > 0) {
+
+                        var visitActivityRowData = context.entities[0];
+
+                        var pe_activitytype = LLP.Common.GetAttributeValue(visitActivityRowData, "pe_activitytype");
+
+                        switch (pe_activitytype) {
+                            case VisitActivityRow.eActivityType.Order:
+                                // create on CRM
+                                var pe_order = LLP.Common.GetAttributeValue(visitActivityRowData, "pe_orderid");
+                                MobileCRM.UI.FormManager.showEditDialog(pe_order.entityName, pe_order.id, null);
+                                break;
+                            case VisitActivityRow.eActivityType.MASegmentTTandMT:
+                                VisitActivityRow.OpenMADialog(visitActivityRowData, "pe_masegmentationttmtid", "pe_masegmentationttmt");
+                                // create on resco
+                                break;   
+                            case VisitActivityRow.eActivityType.Survey:
+                                // create on CRM template
+                                VisitActivityRow.OpenSurvey(visitActivityRowData);
+                                break;
+                            case VisitActivityRow.eActivityType.TableSurvey:
+                                // create on CRM template
+                                VisitActivityRow.OpenTableSurvey(visitActivityRowData);
+                                break;
+                            case VisitActivityRow.eActivityType.ContractMonitoring:
+                                //create on crm
+                                var pe_contractmonitoringid = LLP.Common.GetAttributeValue(visitActivityRowData, "pe_contractmonitoringid");
+                                MobileCRM.UI.FormManager.showEditDialog(pe_contractmonitoringid.entityName, pe_contractmonitoringid.id, null);
+                                break;
+                            case VisitActivityRow.eActivityType.MAOtherOFF:
+                                // create on resco
+                                VisitActivityRow.OpenMADialog(visitActivityRowData, "pe_maotheroffid", "pe_maotheroff");
+                                break;
+                            case VisitActivityRow.eActivityType.MAOtherON:
+                                // create on resco
+                                VisitActivityRow.OpenMADialog(visitActivityRowData, "pe_maotheronid", "pe_maotheron");
+                                break;
+                            case VisitActivityRow.eActivityType.MASegmentationON:
+                                // create on resco
+                                VisitActivityRow.OpenMADialog(visitActivityRowData, "pe_masegmentationonid", "pe_masegmentationon");
+                                break;
+                            case VisitActivityRow.eActivityType.MAServiceON:
+                                // create on resco
+                                VisitActivityRow.OpenMADialog(visitActivityRowData, "pe_maserviceonid", "pe_maserviceon");
+                                break;
+                            case VisitActivityRow.eActivityType.CampaignExecutionPromo:
+                            case VisitActivityRow.eActivityType.CampaignExecutionPrice:
+                                // create on CRM
+                                var pe_campaignexecutionid = LLP.Common.GetAttributeValue(visitActivityRowData, "pe_campaignexecutionid");
+                                MobileCRM.UI.FormManager.showEditDialog(pe_campaignexecutionid.entityName, pe_campaignexecutionid.id, null);
+                                break;
+                            case VisitActivityRow.eActivityType.Task:
+                                // create on CRM
+                                var pe_taskid = LLP.Common.GetAttributeValue(visitActivityRowData, "pe_taskid");
+                                MobileCRM.UI.FormManager.showEditDialog(pe_taskid.entityName, pe_taskid.id, null);
+                                break;
+                            case VisitActivityRow.eActivityType.InventoryCheck:
+                                // create on CRM
+                                var pe_inventorycheckid = LLP.Common.GetAttributeValue(visitActivityRowData, "pe_inventorycheckid");
+                                MobileCRM.UI.FormManager.showEditDialog(pe_inventorycheckid.entityName, pe_inventorycheckid.id, null);
+                                break;
+                            default:
+                                MobileCRM.UI.EntityList.clickCell(context.event.row, context.event.cell, MobileCRM.bridge.alert, null);
+                                return;
+                        }
+                    }
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.InventoryCheckLineRow, "VisitActivityRow.OnClick: ", e);
+                }
+            },
+
+
+            GetEntityName: function(visitAvtivityEntity)
+            {
+                try {
+
+                    var pe_orderid = LLP.Common.GetAttributeValue(visitAvtivityEntity, "pe_orderid");
+                    if (!LLP.Common.IsNullOrEmpty(pe_orderid)){
+                        return "pe_orderid";
+                    }
+
+                    var pe_tablesurvey = LLP.Common.GetAttributeValue(visitAvtivityEntity, "pe_tablesurveyid");
+                    if (!LLP.Common.IsNullOrEmpty(pe_tablesurvey)) {
+                        return "pe_tablesurveyid";
+                    }
+
+                    var pe_survey = LLP.Common.GetAttributeValue(visitAvtivityEntity, "pe_surveyid");
+                    if (!LLP.Common.IsNullOrEmpty(pe_survey)) {
+                        return "pe_surveyid";
+                    }
+
+                    // SUR tam ma preklep a nemuzeme cekat na to az to udela tak jak ma
+                    var pe_survey = LLP.Common.GetAttributeValue(visitAvtivityEntity, "pe_surveryid");
+                    if (!LLP.Common.IsNullOrEmpty(pe_survey)) {
+                        return "pe_surveyid";
+                    }
+                    
+                    var pe_contractmonitoringid = LLP.Common.GetAttributeValue(visitAvtivityEntity, "pe_contractmonitoringid");
+                    if (!LLP.Common.IsNullOrEmpty(pe_contractmonitoringid)) {
+                        return "pe_contractmonitoringid";
+                    }
+
+
+                } catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.InventoryCheckLineRow, "VisitActivityRow.GetEntityName: ", e);
+                }
+            },
+
+            OpenSurvey: function (pe_visitactivityRow)
+            {
+                try {
+
+                    // do survey je nutne poslat accountid a visitactivityid 
+                    //proto je zde nutne zaregistrovat globalni udalost a provolat se ze survey
+                    MobileCRM.bridge.onGlobalEvent("VisitActivityIDGetSurvey", function (args)
+                    {
+                        MobileCRM.bridge.raiseGlobalEvent("VisitActivityIDSetSurvey", pe_visitactivity);
+
+                    }, true);
+
+                    pe_visitactivity = pe_visitactivityRow;
+
+                    // oprava SUR preklep
+                    var pe_surveyid = LLP.Common.GetAttributeValue(pe_visitactivityRow, "pe_surveyid");
+                   
+                    MobileCRM.Questionnaire.showForm(pe_surveyid.id);
+
+                } catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.InventoryCheckLineRow, "VisitActivityRow.OpenSurvey: ", e);
+                }
+            },
+
+            OpenTableSurvey: function (pe_visitactivityRow)
+            {
+                try {
+                    var pe_tablesurvey = LLP.Common.GetAttributeValue(pe_visitactivityRow, "pe_tablesurveyid");
+                    var pe_account = LLP.Common.GetAttributeValue(pe_visitactivityRow, "pe_accountid");
+                    var accountRef = new MobileCRM.Reference(pe_account.entityName, pe_account.id, pe_account.primaryName);
+
+                    var pe_visitactivity = new MobileCRM.Reference("pe_visitactivity", pe_visitactivityRow.id);
+                    // lze odeslat jenom reference entitu to nevezme jenom hlavicku proto se account posila jako text
+                    var textAccount = JSON.stringify(pe_account);
+
+                    var relationShip = new MobileCRM.Relationship("pe_visitactivity", pe_visitactivity, null, textAccount);
+                    MobileCRM.UI.FormManager.showEditDialog("pe_tablesurvey", pe_tablesurvey.id, relationShip);
+                    
+                } catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.InventoryCheckLineRow, "VisitActivityRow.OpenTableSurvey: ", e);
+                }
+
+            },
+
+
+            OpenMADialog: function (visitActivityRowData,parameterName,entityName)
+            {
+
+                var openEntity = LLP.Common.GetAttributeValue(visitActivityRowData, parameterName);
+
+                if (LLP.Common.IsNullOrEmpty(openEntity)) {
+                    // vytvoreni noveho zaznamu
+                    var VisitActivityRef = new MobileCRM.Reference("pe_visitactivity", visitActivityRowData.id, visitActivityRowData.primaryName);
+                    var pe_account = LLP.Common.GetAttributeValue(visitActivityRowData, "pe_accountid");
+
+                    var date = new Date();
+
+                    MobileCRM.UI.FormManager.showNewDialog(entityName, null,
+                        {
+                            "@initialize": {
+                                pe_name: visitActivityRowData.primaryName + " " + date.getDay() + "." + (date.getMonth() + 1) + "." + date.getFullYear(),
+                                pe_visitactivityid: VisitActivityRef,
+                                pe_accountid: pe_account,
+                            }
+                        });
+                }
+                else {
+                    // otevreni existujiciho zaznamu
+                    MobileCRM.UI.FormManager.showEditDialog(openEntity.entityName, openEntity.id);
+                }
+            },
+
+
+            OpenMAService: function (visitActivityRowData)
+            {
+
+                var pe_maserviceon = LLP.Common.GetAttributeValue(visitActivityRowData, "pe_maserviceonid");
+
+                if (LLP.Common.IsNullOrEmpty(pe_maserviceon)) {
+                    // vytvoreni noveho zaznamu
+                    var VisitActivityRef = new MobileCRM.Reference("pe_visitactivity", visitActivityRowData.id, visitActivityRowData.primaryName);
+                    var pe_account = LLP.Common.GetAttributeValue(visitActivityRowData, "pe_accountid");
+
+                    var date = new Date();
+
+                    MobileCRM.UI.FormManager.showNewDialog("pe_maserviceon", null,
+                        {
+                            "@initialize": {
+                                pe_name: visitActivityRowData.primaryName + " " + date.getDay() + "." + (date.getMonth() + 1) + "." + date.getFullYear(),
+                                pe_visitactivityid: VisitActivityRef,
+                                pe_accountid: pe_account,
+                                statuscode: 1
+                            }
+                        });
+                }
+                else {
+                    // otevreni existujiciho zaznamu
+                    MobileCRM.UI.FormManager.showEditDialog(pe_maserviceon.entityName, pe_maserviceon.id);
+                }
+            },
+
+            OpenMASegmentationON: function (visitActivityRowData)
+            {
+
+                var pe_masegmentationon = LLP.Common.GetAttributeValue(visitActivityRowData, "pe_masegmentationonid");
+
+                if (LLP.Common.IsNullOrEmpty(pe_masegmentationon)) {
+                    // vytvoreni noveho zaznamu
+                    var VisitActivityRef = new MobileCRM.Reference("pe_visitactivity", visitActivityRowData.id, visitActivityRowData.primaryName);
+                    var pe_account = LLP.Common.GetAttributeValue(visitActivityRowData, "pe_accountid");
+
+                    var date = new Date();
+                    
+
+                    MobileCRM.UI.FormManager.showNewDialog("pe_masegmentationon", null,
+                        {
+                            "@initialize": {
+                                pe_name: visitActivityRowData.primaryName + " " + date.getDay() + "." + (date.getMonth() + 1) + "." + date.getFullYear(),
+                                pe_visitactivityid: VisitActivityRef,
+                                pe_accountid: pe_account,
+                            }
+                        });
+                }
+                else {
+                    // otevreni existujiciho zaznamu
+                    MobileCRM.UI.FormManager.showEditDialog(pe_masegmentationon.entityName, pe_masegmentationon.id);
+                }
+            },
+
+            OnLoad: function () {
+                try {
+                    MobileCRM.UI.EntityList.onClick(VisitActivityRow.OnClick, true);
+                }
+                catch (e) {
+                   
+                }
+            },
+
+           
+
+        }
+
+        window.onload = function () {
+            VisitActivityRow.OnLoad();
+        }
+
+    </script>
+</body>
+</html>

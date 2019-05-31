@@ -1,0 +1,490 @@
+﻿<!DOCTYPE html>
+
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="utf-8" />
+    <title>Empty Offline HTML page</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="initial-scale=1, user-scalable=no" />
+    <script src="..\Common\JSBridge.js"></script>
+    <script src="..\Common\pe_GlobalCommonFunctions.js"></script>
+    <script src="..\Common\pe_GlobalCommonFunctions.js"></script>
+    <script src="..\Common\jquery-3.3.1.min.js"></script>
+    <script src="..\Common\popper.min.js"></script>
+    <script src="..\Common\bootstrap.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="..\Common\bootstrap.min.css">
+    <style>
+        label {
+            color: white;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container mt-2">
+        <div class="row mt-2">
+            <div class="col">
+                <button id="btnActivate" class="btn btn-primary btn-block" onclick="Enrollment.OnClick_Activate();">Activate</button>
+            </div>
+        </div>
+        <div class="row mt-2">
+            <div class="col">
+                <button id="btnScheduleActivation" class="btn btn-primary btn-block" onclick="Enrollment.OnClick_ScheduleActivation();">Schedule Activation</button>
+            </div>
+        </div>
+        <div class="row mt-2">
+            <div class="col">
+                <button id="btnBackToDraft" class="btn btn-primary btn-block" onclick="Enrollment.OnClick_BackToDraft();">Back To Draft</button>
+            </div>
+        </div>
+    </div>
+    <label id="logLabel"></label>
+    <script>
+
+        //Task 5150
+        //Resco/CRM
+        //------------
+        //entita: pe_enrollment
+
+        //pokud statuscode == 1 (active)
+        //pak nastavit attributy:
+        //pe_wayofenrollment = 100 000 000
+        //pe_activatedon = datetime.now()
+
+        //- neresit, pokud jiz napr. pe_activatedon je jiz necim naplnene, vzdy prepsat
+        //*******************************************************************************
+        //Task 5202 |
+        //----------
+        //pouze Resco:
+        //na entite: pe_enrollment
+        //(bude vzdy vse jen pro cteni krome Status Reason)
+
+        //PZA 13.3.2019 - po dohodě s ODV upraveno následovně:
+        //Procházet všechny pole na formuláři. Pokud dané pole nebude statuscode, nastavit ho pouze pro čtení
+
+        //Původní znění:
+        //----------------
+        //jen pro cteni:
+        //pe_accountid
+        //pe_activatedon
+        //pe_campaignid
+        //pe_card
+        //pe_cardvalidto
+        //pe_lastcardappliedon
+        //pe_wayofenrollment
+        //ownerid
+        //pe_name
+        //editovatelne:
+        //statuscode
+        //******************************************************************************
+        //Task 5259 |
+        //----------
+        //Resco
+        //------------
+        //entita: pe_enrollment
+
+        //1) = mame hotovo
+        //Toto je zkopirovane puvodni zadani z Related tasku 5150 a doplneno o nove veci (tucne).
+        //Tlacitko "Activate". Bude menit statuscode=1 (active).
+        //Aktivni bud, pouze pokud jsou splneny vsechny nasledujici podminky:
+        //    - statecode = 1 (Active)
+        //    - statuscode != 1
+        //    - pe_enrollmentcard != 100.000.001
+        //    - pe_scheduleactivationfrom is NULL
+        //    - campaign.statuscode = 2
+
+        //pak nastavit attributy:
+        //pe_wayofenrollment = 100 000 000
+        //pe_activatedon = datetime.now()
+        //vymazat pole pe_scheduleactivationfrom
+
+        //- neresit, pokud jiz napr. pe_activatedon je jiz necim naplnene, vzdy prepsat
+
+
+        //2) Nove pole pe_scheduleactivationfrom
+        //Pri zmene hodnoty pole kontrolovat, zda je v budoucnosti. Pokud neni, nepovolit zmenu a zobrazit "Schedule date must be in future".
+
+        //3) Nove tlacitko "Schedule Activation"
+        //Aktivni bude, pouze pokud jsou splneny vsechny nasledujici podminky:
+        //    - statecode = 1 (Active)
+        //    - statuscode = 100.000.001
+        //    - pe_enrollmentcard != 100.000.001
+        //    - pe_scheduleactivationfrom is not NULL
+        //    - campaign.statuscode = 2
+
+        //Tlacitko nastavi statuscode = 100.000.000 a uzamkne pole pe_scheduleactivationfrom
+
+        //4) Nove tlacitko "Back to Draft"
+        //Aktivni bude, pouze pokud jsou splneny vsechny nasledujici podminky:
+        //    - statecode = 1 (Active)
+        //    - statuscode != 100.000.001
+
+        //Tlacitko:
+        //    - nastavi statuscode = 100.000.001
+        //    - vymaze pole pe_scheduleactivationfrom
+
+
+        //5) nastaveni formulare enrollment
+        //jen pro cteni:
+        //pe_accountid
+        //pe_campaignid
+        //statuscode
+        //pe_activatedon
+        //pe_card
+        //pe_cardvalidto
+        //pe_lastcardapplieadon
+        //ownedid
+
+        //editovatelne:
+        //pe_scheduleactivationfrom
+
+        //6) na enrollmentu pridat nas Resco Quick View primo pod pe_campaignid:
+        //pe_campaignid.statuscode
+        //pe_campaignid.actualstart
+        //pe_campaignid.proposedend
+        //pe_campaignid.description
+        //---mezera--- (pokud to jde)
+        //pe_campaignid.pe_maximumnumberofpackages
+        //pe_campaignid.pe_numberofbenefitsperpackage
+        //pe_campaignid.pe_giftdescription
+        //pe_campaignid.pe_numberofproducts
+
+       
+        var Enrollment = Enrollment || {
+            
+            Enums: {
+                // Detail view display name
+                DisplayViewName: {
+                    General: "General"
+                },
+                StateCode: {
+                    Active: 0,
+                    Inactive: 1
+                },
+                StatusCode: {
+                    Active: 1,
+                    Planned: 100000000,
+                    Draft: 100000001,
+                    Inactive: 2
+                },
+                CampaignStatusCode: {
+                    Running: 2
+                },
+                WayOfEnrollment: {
+                    ByRescoUser: 100000000,
+                    Bulk: 100000001
+                },
+                Card: {
+                    Yellow: 100000000,
+                    Red: 100000001
+                }
+            },
+            Attributes: {
+                ReadOnly: ["pe_accountid", "pe_campaignid", "statuscode", "pe_activatedon", "pe_card", "pe_cardvalidto", "pe_lastcardapplieadon", "ownedid"],
+                Editable: ["pe_scheduleactivationfrom"]
+            },
+            SetcampaigndetailValues: function (entityForm, callback) {
+                try {
+                    if (entityForm) {
+                        LLP.SetExecutionContext(entityForm);
+                    }
+
+                    var pe_campaignid = LLP.Common.Attribute_GetValue(Enrollment.Enums.DisplayViewName.General, "pe_campaignid");
+
+                    if (pe_campaignid) {
+                        var pe_campaign = MobileCRM.DynamicEntity.loadById(pe_campaignid.entityName, pe_campaignid.id,
+                            function (result) {
+                                MobileCRM.UI.EntityForm.requestObject(function (entityForm) {
+                                    LLP.SetExecutionContext(entityForm);
+                                    var addTextBox = false;
+                                    var textbox = LLP.Common.Attribute_Get(Enrollment.Enums.DisplayViewName.General, "campaigndetail");
+                                    if (!textbox) {
+                                        addTextBox = true;
+                                        textbox = new MobileCRM.UI.DetailViewItems.TextBoxItem("campaigndetail", "Campaign Detail");
+                                        textbox.isEnabled = false;
+                                        textbox.maxLength = 5000;
+                                        textbox.numberOfLines = 5;
+                                        textbox.style = "MultiLine";
+                                    }
+
+                                    textbox.value = "";
+                                    Enrollment.AddValueToMultiline(textbox, "Status Reason: ", LLP.Common.GetAttributeValue(result, "statuscode"), false);
+                                    Enrollment.AddValueToMultiline(textbox, "Actual Start Date: ", LLP.Common.GetAttributeValue(result, "actualstart"), true);
+                                    Enrollment.AddValueToMultiline(textbox, "Proposed End Date: ", LLP.Common.GetAttributeValue(result, "proposedend"), true);
+                                    Enrollment.AddValueToMultiline(textbox, "Description: ", LLP.Common.GetAttributeValue(result, "description"), true);
+                                    Enrollment.AddValueToMultiline(textbox, "", "", true);
+                                    Enrollment.AddValueToMultiline(textbox, "Maximum Number of Packages: ", LLP.Common.GetAttributeValue(result, "pe_maximumnumberofpackages"), true);
+                                    Enrollment.AddValueToMultiline(textbox, "Number of Benefits per Package: ", LLP.Common.GetAttributeValue(result, "pe_numberofbenefitsperpackage"), true);
+                                    Enrollment.AddValueToMultiline(textbox, "Benefit Description: ", LLP.Common.GetAttributeValue(result, "pe_giftdescription"), true);
+                                    Enrollment.AddValueToMultiline(textbox, "Number of Products (Threshold): ", LLP.Common.GetAttributeValue(result, "pe_numberofproducts"), true);
+
+                                    if (addTextBox) {
+                                        var detailView = entityForm.getDetailView(Enrollment.Enums.DisplayViewName.General);
+                                        var index = detailView.getItemIndex("pe_campaignid");
+                                        detailView.insertItem(textbox, index + 1);
+                                    }
+                                    else {
+                                        LLP.Common.Attribute_Visible(Enrollment.Enums.DisplayViewName.General, "campaigndetail");
+                                    }
+
+                                    if (callback) {
+                                        callback();
+                                    }
+                                },
+                                function (error) {
+                                    LLP.LOG.Error(LLP.Enums.Module.Enrollment, "SetcampaigndetailValues -> MobileCRM.UI.EntityForm.requestObject:", error);
+                                }, null);
+
+                            },
+                            function (error) {
+                                LLP.LOG.Error(LLP.Enums.Module.Enrollment, "SetcampaigndetailValues -> load account MobileCRM.DynamicEntity.loadById (" + pe_accountid.id + "):", error);
+                            }, null);
+                    }
+                    else {
+                        var textbox = LLP.Common.Attribute_Get(Enrollment.Enums.DisplayViewName.General, "campaigndetail");
+                        if (textbox) {
+                            LLP.Common.Attribute_Invisible(Enrollment.Enums.DisplayViewName.General, "campaigndetail");
+                        }
+                    }
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Enrollment, "SetCampaignDetailValues:", e);
+                }
+            },
+            AddValueToMultiline: function (control, text, value, newLine, textIsDelimiter) {
+
+                if (!control.value) {
+                    control.value = "";
+                }
+
+                if (newLine) {
+                    control.value += "\n";
+                }
+
+                if (!textIsDelimiter) {
+                    control.value += text;
+                }
+
+                if (value && textIsDelimiter) {
+                    control.value += text + value;
+                }
+                else if (value) {
+                    control.value += value;
+                }
+            },
+            CheckStatusCode: function () {
+                try {
+                    var statuscode = LLP.Common.Attribute_GetValue(Enrollment.Enums.DisplayViewName.General, "statuscode");
+                    switch(statuscode)
+                    {
+                        case Enrollment.Enums.StatusCode.Active:
+                            LLP.Common.Attribute_SetValue(Enrollment.Enums.DisplayViewName.General, "pe_wayofenrollment", Enrollment.Enums.WayOfEnrollment.ByRescoUser);
+                            LLP.Common.Attribute_SetValue(Enrollment.Enums.DisplayViewName.General, "pe_activatedon", new Date());
+                            break;
+                        case Enrollment.Enums.StatusCode.Planned:
+                            LLP.Common.Attribute_Disabled(Enrollment.Enums.DisplayViewName.General, "pe_scheduleactivationfrom");
+                            break;
+                    }
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Enrollment, "OnLoad", e);
+                }
+            },
+            StatusCodeToSet: null,
+            SetReadOnlyFields: function() {
+                try {
+                    var fieldsFailed = "";
+                    var delimiter = "";
+                    var allAttributes = LLP.Common.Attribute_GetAllInView(Enrollment.Enums.DisplayViewName.General);
+                    for (let i = 0; i < Enrollment.Attributes.ReadOnly.length; i++) {
+                        LLP.Common.Attribute_Disabled(Enrollment.Enums.DisplayViewName.General, Enrollment.Attributes.ReadOnly[i]);
+                    }
+
+                    for (let i = 0; i < Enrollment.Attributes.Editable.length; i++) {
+                        LLP.Common.Attribute_Enabled(Enrollment.Enums.DisplayViewName.General, Enrollment.Attributes.Editable[i]);
+                    }
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Enrollment, "SetReadOnlyFields", e);
+                }
+            },
+            GetCampaignStatusCode: function(pe_campaignRef, callback) {
+                try {
+                    MobileCRM.DynamicEntity.loadById(pe_campaignRef.entityName, pe_campaignRef.id, callback,
+                    function (error) {
+                        LLP.LOG.Error(LLP.Enums.Module.Enrollment, "SetReadOnlyFields", e);
+                    }, null);
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Enrollment, "GetCampaignStatusCode", e);
+                }
+            },
+            SetStatusCode: function(entity, statuscode) {
+                try {
+                    LLP.Common.SetAttributeValue(entity, statuscode);
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Enrollment, "SetStatusCode", e);
+                }
+            },
+            SetButtonsState: function(entity) {
+                try {
+                    Enrollment.GetCampaignStatusCode(LLP.Common.GetAttributeValue(entity, "pe_campaignid"), function (campaign) {
+                        MobileCRM.UI.EntityForm.requestObject(function (entityForm) {
+                            let statecode = LLP.Common.GetAttributeValue(entityForm.entity, "statecode");
+                            let statuscode = LLP.Common.Attribute_GetValue(Enrollment.Enums.DisplayViewName.General, "statuscode");
+                            let pe_card = LLP.Common.Attribute_GetValue(Enrollment.Enums.DisplayViewName.General, "pe_card");
+                            let pe_scheduleactivationfrom = LLP.Common.Attribute_GetValue(Enrollment.Enums.DisplayViewName.General, "pe_scheduleactivationfrom");
+                            let campaignStatusCode = LLP.Common.GetAttributeValue(campaign, "statuscode");
+
+                            let activateEnabled = statecode == Enrollment.Enums.StateCode.Active && statuscode != Enrollment.Enums.StatusCode.Active &&
+                                                  pe_card != Enrollment.Enums.Card.Red && !pe_scheduleactivationfrom && campaignStatusCode != Enrollment.Enums.CampaignStatusCode.Running;
+
+                            let scheduleActivationEnabled = statecode == Enrollment.Enums.StateCode.Active && statuscode == Enrollment.Enums.StatusCode.Draft &&
+                                                  pe_card != Enrollment.Enums.Card.Red && pe_scheduleactivationfrom != null && campaignStatusCode != Enrollment.Enums.CampaignStatusCode.Running;
+                            
+                            let backToDraftEnabled = statecode == Enrollment.Enums.StateCode.Active && statuscode != Enrollment.Enums.StatusCode.Draft;
+
+                            LLP.HtmlControl.SetDisabled("btnActivate", !activateEnabled);
+                            LLP.HtmlControl.SetDisabled("btnScheduleActivation", !scheduleActivationEnabled);
+                            LLP.HtmlControl.SetDisabled("btnBackToDraft", !backToDraftEnabled);
+                        },
+                        function (error) {
+                            LLP.LOG.Error(LLP.Enums.Module.Enrollment, "CheckActivateButton -> MobileCRM.UI.EntityForm.requestObject", error);
+                        }, null);
+                        
+                    });
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Enrollment, "CheckActivateButton", e);
+                }
+            },
+            OnClick_Activate: function() {
+                try {
+                    MobileCRM.UI.EntityForm.requestObject(function (entityForm) {
+                        LLP.Common.SetAttributeValue(entityForm.entity, "statuscode", Enrollment.Enums.StatusCode.Active);
+                        LLP.Common.SetAttributeValue(entityForm.entity, "pe_wayofenrollment", Enrollment.Enums.WayOfEnrollment.ByRescoUser);
+                        LLP.Common.SetAttributeValue(entityForm.entity, "pe_activatedon", new Date());
+                        LLP.Common.SetAttributeValue(entityForm.entity, "pe_scheduleactivationfrom", null);
+                        MobileCRM.UI.EntityForm.save();
+                    },
+                    function (error) {
+                        LLP.LOG.Error(LLP.Enums.Module.Enrollment, "OnClick_Activate -> MobileCRM.UI.EntityForm.requestObject", error);
+                    }, null);
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Enrollment, "OnClick_Activate", e);
+                }
+            },
+            OnClick_ScheduleActivation: function () {
+                try {
+                    MobileCRM.UI.EntityForm.requestObject(function (entityForm) {
+                        Enrollment.StatusCodeToSet = Enrollment.Enums.StatusCode.Planned;
+
+                        if (!entityForm.isDirty) {
+                            LLP.Common.SetAttributeValue(entityForm.entity, "statuscode", Enrollment.StatusCodeToSet);
+                        }
+
+                        MobileCRM.UI.EntityForm.save();
+                    },
+                    function (error) {
+                        LLP.LOG.Error(LLP.Enums.Module.Enrollment, "OnClick_Activate -> MobileCRM.UI.EntityForm.requestObject", e);
+                    }, null);
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Enrollment, "OnClick_Activate", e);
+                }
+            },
+            OnClick_BackToDraft: function() {
+                try{
+                    MobileCRM.UI.EntityForm.requestObject(function (entityForm) {
+                        Enrollment.StatusCodeToSet = Enrollment.Enums.StatusCode.Draft;
+
+                        if (!entityForm.isDirty) {
+                            LLP.Common.SetAttributeValue(entityForm.entity, "statuscode", Enrollment.StatusCodeToSet);
+                        }
+
+                        MobileCRM.UI.EntityForm.save();
+                    },
+                    function (error) {
+                        LLP.LOG.Error(LLP.Enums.Module.Enrollment, "OnClick_Activate -> MobileCRM.UI.EntityForm.requestObject", e);
+                    }, null);
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Enrollment, "OnClick_Activate", e);
+                }
+            },
+            OnChange_StatusCode: function (entityForm) {
+                try {
+                    LLP.SetExecutionContext(entityForm);
+                    Enrollment.CheckStatusCode();
+                    Enrollment.SetButtonsState(entityForm.entity);
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Enrollment, "OnChange_StatusCode", e);
+                }
+            },
+            OnChange_ScheduleActivationFrom: function(entityForm) {
+                try {
+                    LLP.SetExecutionContext(entityForm);
+                    let pe_scheduleactivationfrom = LLP.Common.Attribute_GetValue(Enrollment.Enums.DisplayViewName.General, "pe_scheduleactivationfrom");
+                    if(pe_scheduleactivationfrom < new Date()) {
+                        MobileCRM.bridge.alert("Schedule date must be in future");
+                        LLP.Common.Attribute_SetValue(Enrollment.Enums.DisplayViewName.General, "pe_scheduleactivationfrom", null);
+                    }
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Enrollment, "OnChange_StatusCode", e);
+                }
+            },
+            OnChange_Any_CheckButtonsState: function (entityForm) {
+                try {
+                    Enrollment.SetButtonsState(entityForm.entity);
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Enrollment, "OnChange_StatusCode", e);
+                }
+            },
+            OnLoad: function () {
+                try
+                {
+                    MobileCRM.UI.EntityForm.onSave(Enrollment.OnSave, true, null);
+                    MobileCRM.UI.EntityForm.onItemChange("statuscode", Enrollment.OnChange_StatusCode, true, null);
+                    MobileCRM.UI.EntityForm.onItemChange("pe_scheduleactivationfrom", Enrollment.OnChange_ScheduleActivationFrom, true, null);
+                    MobileCRM.UI.EntityForm.onItemChange("statecode", Enrollment.OnChange_Any_CheckButtonsState, true, null);
+                    MobileCRM.UI.EntityForm.onItemChange("pe_card", Enrollment.OnChange_Any_CheckButtonsState, true, null);
+                    MobileCRM.UI.EntityForm.onItemChange("pe_scheduleactivationfrom", Enrollment.OnChange_Any_CheckButtonsState, true, null);
+                    MobileCRM.UI.EntityForm.onItemChange("pe_campaignid", Enrollment.SetcampaigndetailValues, true, null);
+
+                    MobileCRM.UI.EntityForm.requestObject(function (entityForm) {
+                        LLP.SetExecutionContext(entityForm);
+                        Enrollment.SetcampaigndetailValues(null, function () {
+                            Enrollment.CheckStatusCode();
+                            Enrollment.SetButtonsState(entityForm.entity);
+                            Enrollment.SetReadOnlyFields();
+                        });
+                    });
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Enrollment, "OnLoad", e);
+                }
+            },
+            OnSave: function (entityForm) {
+                try {
+                    if (Enrollment.StatusCodeToSet) {
+                        Enrollment.SetStatusCode(entityForm.entity, Enrollment.StatusCodeToSet);
+                    }
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Enrollment, "OnSave", e);
+                }
+            }
+        }
+
+        window.onload = function () {
+            Enrollment.OnLoad();
+        }
+
+    </script>
+</body>
+</html>

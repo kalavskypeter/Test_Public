@@ -1,0 +1,750 @@
+﻿<!DOCTYPE html>
+
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="utf-8" />
+    <title>Empty Offline HTML page</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="initial-scale=1, user-scalable=no" />
+    <script src="..\Common\JSBridge.js"></script>
+    <script src="..\Common\pe_GlobalCommonFunctions.js"></script>
+    <script src="..\Common\jquery-3.3.1.min.js"></script>
+    <script src="..\Common\popper.min.js"></script>
+    <script src="..\Common\bootstrap.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="..\Common\bootstrap.min.css">
+</head>
+<body onload="ContractMonitoring.OnLoad();">
+
+    <div class="container mt-2">
+        <div class="row">
+            <div class="col">
+                <button id="btnComplete" class="btn btn-primary btn-block" onclick="ContractMonitoring.OnClick_Complete();">Completed</button>
+            </div>
+        </div>
+    </div>
+    <label id="logLabel"></label>
+    <script>
+
+        //********************************************************************************************************************************
+        //Task 4884 |
+        //-----------
+        //Bude vznikat jak v Resco tak v SFA:
+        //    - v SFA bude vznikat pouze hlavička
+        //    - v Resco pak budou vznikat jak hlavičky tak řádky
+        //      - pokud bude v Resco hlavička a prázdné řádky a stav Draft, vždy dogenerovávat řádky (stejné jako inventory check)
+
+        //    Contract Monitoring (pe_contractmonitoring) - hlídání dodržování smlouvy
+        //    - vazba na Account (pe_accountid)
+        //    - vazba na Contract (pe_contractid)
+        //       - na Contract je pak subgrid vsech Contract Termu
+
+        //Ja bych potreboval vytvorit tolik radku, kolik je zaznamu v Contract Termu = to jsou ty jednotlive smluvni podminky
+        //- kopirovat z Termu "Long name" do standardniho pole "pe_contractmonitoringterm.pe_name"
+        //- kopirovat z Contract Term hodnotu Number do pole "pe_contractmonitoringterm.pe_numberrequired"
+        //********************************************************************************************************************************
+        //Task 4889 |
+        //-----------
+        //zde bude jeste upresneno, nemame finalni zadani ale:
+
+        //pri nastaveni Status Reason na pe_contractmonitoring = Inactive (=ze vse probehlo uspesne) potrebuji se podivat na vsechny radky a z nich napocitat skore.
+        //U policek "bolean" je to jasne = zde true znamena, ze smlouvu dodrzuje, false ze ne
+        //Number bude na kolik procent, kolik pocet..cenu ma v restauraci a zde nemame podklady jak to merit = dodame co nejdrive
+
+        //ja bych potreboval projet tedy vsechny radky a do pole "pe_contractmonitoring.pe_result" napocitat jednodusse:
+        //        - pole bollean je jednoduche
+        //        - number - zde pockat na podklady
+
+        //Pak vzit vsechny radky a propsat na hlavicku jejich procentualni vysledek viz tabulka nize, opet do pole "pe_finalresult" tentokrat ale jiz decimal
+
+        //The user does 3 contract monitoring with the following results:
+        //Terms     1th Monitoring Result     2nd Monitoring Result       3rd Monitoring Result
+        //Term 1    Correct                   Correct                     Fail
+        //Term 2    Correct                   Correct                     Correct
+        //Term 3    Correct                   Correct                     Fail
+        //Term 4    Correct                   Fail                        Fail
+
+        //The system will calculate:
+        //Terms             1th Monitoring Result       2nd Monitoring Result       3rd Monitoring Result
+        //Final Term Score  100                         75                          25
+
+        //Email od MVI 26.2.2019:
+        //Pokud to cislo, ktere zada SR, bude nizsi nez to z Contract Term, pak bude radek vyhodnocen jako FAIL.
+        //********************************************************************************************************************************
+        // Task 4890 |
+        //------------
+        //navazuje na task 4889
+
+        //- jiz mame na kazdem Contract monitoringu Decimal hodnotu v procentech = uspesnost plneni smlouvy, ale techto kontrol bude behem trvani smlouvy nekolik
+
+        //ja potrebuji dale napocitavat uplne "nahoru" na Contract (pe_contract) celkovy vysledek, takze pri kazdem uzavreni Contract Monitoring (status reason=inactive) 
+        //dostat do pole pe_contract.pe_finalcontractscore vyslednou hodnotu ze vsech Contract Monitoring
+
+        //Terms             1th Monitoring Result       2nd Monitoring Result       3rd Monitoring Result
+        //Final Term Score  100                         75                          25
+        // The system will gradually recalculate (after each monitoring) Payment Proposal, and the final value will be: 66,66%.
+        //********************************************************************************************************************************
+        // Task 4887 |
+        //------------
+        //na Contract term nebudeme filtrovat Status Reason, zobrazime vsechny:
+        //    Draft = generujeme radky
+        //Active = pripraveno pro obchodnika
+        //Cancelled = obchodnik zrusil akci => projdi vsechny radky a u nich nastav Status Reason inactive
+        //Inactive = obchodnik dokoncil uspesne svou praci => projdi vsechny radky a u nich nastav Status Reason inactive
+        //********************************************************************************************************************************
+        //Task 5244 |
+        //----------
+        //v Resco
+        //navazuje/doplnuje parrent task
+        //---
+        //je potreba plnit dve nova pole pri generovani:
+        //    pe_lastnumber
+        //pe_lastboolean 
+
+        //pri generovani radku je potreba dohledat Contract Monitoring, ktery splnuje podminku:
+        //    - je posledni, defacto vzhledem k prave otevrenemu predposledni
+        //    - statuscode == 2 (inactive) (ja asi prejmenuju na Completed)
+
+        //    a) pokud se zadny nenajde -> jde se pryc
+        //b) pokud se najde nejaky pe_contractmonitoring dle podminky tak nacist hodnoty
+        //[last-contract-monitoring][pe_contractmonitoringterm].pe_number -> [aktualni-contract-monitoring][pe_contractmonitoringterm].pe_lastnumber
+        //[last-contract-monitoring][pe_contractmonitoringterm].pe_boolean -> [aktualni-contract-monitoring][pe_contractmonitoringterm].pe_lastboolean
+        //********************************************************************************************************************************
+        //Task 5273 |
+        //----------
+        //Resco
+        //---
+        //entita: pe_contractmonitoring
+        //---
+        //a) nastavit statuscode jen pro cteni
+        //b) vytvorit tlacitko "Completed"
+        //- aktivni jen pokud je statuscode=100,000,000 (draft)
+        //- jinak je tlacitko neaktivni
+        //c) tlacitko bude delat:
+        //    - pri kliknuti na tlacitko se nastavi statuscode=2 (completed, puvodni prejmenovane Inactive)
+        //    - nastavi vsechny radky jako inactive-asi mame? ale nefunguje to..je tam editovatelne view, takze prepnout view na:
+        //        Active Contract Monitoring Terms - Read Only (to uz umime)
+
+        var ContractMonitoring = ContractMonitoring || {
+            ContractMonitoringTermsToSave: [],
+            ContractMonitoringTerms: [],
+            ContractTerms: [],
+            LastContractMonitoringTerms: {},
+            InvalidContractTerms: false,
+            SetToCompleted: false,
+            Enums: {
+                // Detail view display name
+                DisplayViewName: {
+                    General: "General"
+                },
+                StatusCode:
+                {
+                    Completed: 1,
+                    Draft: 100000000,
+                    Cancelled: 100000001,
+                    Inactive: 2
+                },
+                ContractStatusCode: {
+                    Draft: 100000000
+                },
+                TermStatusCode: {
+                    Active: 1,
+                    Inactive: 2
+                },
+                TermFieldType: {
+                    Number: 100000000,
+                    ReadOnly: 100000001,
+                    Percent: 100000002
+                }
+            },
+
+            GetContractTerms: function (entity, callback) {
+                try {
+                    var pe_contractidRef = LLP.Common.GetAttributeValue(entity, "pe_contractid");
+
+                    var xml =
+                            '<fetch>\
+		                    <entity name="pe_contractterm">\
+                            <attribute name="pe_name" />\
+                            <attribute name="pe_number" />\
+                            <attribute name="pe_contracttermid" />\
+		                    <order attribute="pe_name" descending="false" />\
+		                    <filter type="and">\
+			                    <condition attribute="pe_contractid" operator="eq" value="' + pe_contractidRef.id + '" />\
+		                    </filter>\
+                            <link-entity name="pe_term" from="pe_termid" to= "pe_termid">\
+                                <attribute name="pe_termid" />\
+                            </link-entity>\
+		                    </entity>\
+	                    </fetch>';
+
+                    MobileCRM.FetchXml.Fetch.deserializeFromXml(xml, function (fetch) {
+                        fetch.execute("DynamicEntities", function (contractTerms) {
+                            ContractMonitoring.ContractTerms = contractTerms;
+                            callback();
+                        }, MobileCRM.bridge.alert);
+                    }, MobileCRM.bridge.alert);
+                } catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.ContractMonitoring, "GetContractTerms", e);
+                }
+            },
+            GetContractMonitoringTerms: function(entity, callback) {
+                try
+                {
+                    var xml =
+                            '<fetch>\
+		                        <entity name="pe_contractmonitoringterm">\
+                                    <attribute name="pe_contractmonitoringtermid" />\
+                                    <attribute name="pe_number" />\
+                                    <attribute name="pe_boolean" />\
+                                    <attribute name="pe_contracttermid" />\
+		                            <filter type="and">\
+			                            <condition attribute="pe_contractmonitoringid" operator="eq" value="' + entity.id + '" />\
+		                            </filter>\
+                                    <link-entity name="pe_contractterm" from="pe_contracttermid" to="pe_contracttermid" alias="contractterm">\
+                                        <link-entity name="pe_term" from="pe_termid" to="pe_termid" alias="term">\
+                                            <attribute name="pe_fieldtype" />\
+                                        </link-entity>\
+                                    </link-entity>\
+		                        </entity>\
+	                        </fetch>';
+
+                    MobileCRM.FetchXml.Fetch.deserializeFromXml(xml, function (fetch) {
+                        fetch.execute("DynamicEntities", function (contractMonitoringTerms) {
+                            callback(contractMonitoringTerms);
+                        }, MobileCRM.bridge.alert);
+                    }, MobileCRM.bridge.alert);
+                }
+                catch (e) {
+
+                }
+            },
+            ContractMonitoringTermsExists: function (entity, postSaveHandler, createMonitoringTermLinesCallback, skippedCallback) {
+                try {
+                    if (LLP.Common.Attribute_GetValue(ContractMonitoring.Enums.DisplayViewName.General, "statuscode") != ContractMonitoring.Enums.StatusCode.Draft) {
+                        skippedCallback();
+                        return;
+                    }
+
+                    var fetchEntity = new MobileCRM.FetchXml.Entity("pe_contractmonitoringterm");
+                    fetchEntity.addAttribute("pe_contractmonitoringtermid");
+                    var filter = new MobileCRM.FetchXml.Filter();
+                    filter.where("pe_contractmonitoringid", "eq", entity.id);
+                    fetchEntity.filter = filter;
+                    var fetch = new MobileCRM.FetchXml.Fetch(fetchEntity);
+                    fetch.execute(
+                        null, // Take the results as an array of arrays with field values
+                        function (result) {
+                            if (result.length == 0) {
+                                ContractMonitoring.GetContractTerms(entity, function () {
+                                    createMonitoringTermLinesCallback(entity);
+                                });
+                            } 
+                            else if (postSaveHandler != null) {
+                                postSaveHandler.resumePostSave();
+                            }
+                        },
+                        function (error) {
+                            LLP.LOG.Error(LLP.Enums.Module.ContractMonitoring, "ContractMonitoringTermsExists -> fetch.execute", error);
+                        }
+                    );
+                } catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.ContractMonitoring, "ContractMonitoringTermsExists: ", e);
+                }
+            },
+            CreateMonitoringTermLines: function (entity, postSaveHandler) {
+                // Returns true, if contract monitoring term lines doesn't exists and was successfully created
+                try {
+                    ContractMonitoring.ContractMonitoringTermsExists(entity, postSaveHandler,
+                        // Try to create contract monitoring lines - if success, return true, otherwise false
+                        function (entity) {
+
+                        var pe_contractmonitoringRef = new MobileCRM.Reference(entity.entityName, entity.id, entity.primaryName);
+                        var error = false;
+
+                        for (var i = 0; i < ContractMonitoring.ContractTerms.length; i++) {
+
+                            try {
+                                var contractTermName = LLP.Common.GetAttributeValue(ContractMonitoring.ContractTerms[i], "pe_name");
+                                var pe_contracttermRef = new MobileCRM.Reference("pe_contractterm", ContractMonitoring.ContractTerms[i].id, contractTermName);
+                                var pe_contractmonitoringterm = new MobileCRM.DynamicEntity.createNew("pe_contractmonitoringterm");
+                                LLP.Common.SetAttributeValue(pe_contractmonitoringterm, "pe_name", contractTermName);
+                                LLP.Common.SetAttributeValue(pe_contractmonitoringterm, "pe_numberrequired", LLP.Common.GetAttributeValue(ContractMonitoring.ContractTerms[i], "pe_number"));
+                                LLP.Common.SetAttributeValue(pe_contractmonitoringterm, "pe_contractmonitoringid", pe_contractmonitoringRef);
+                                LLP.Common.SetAttributeValue(pe_contractmonitoringterm, "pe_contracttermid", pe_contracttermRef);
+
+                                var lastCMTerm = ContractMonitoring.LastContractMonitoringTerms[pe_contracttermRef.id];
+
+                                if (lastCMTerm) {
+                                    LLP.Common.SetAttributeValue(pe_contractmonitoringterm, "pe_lastnumber", LLP.Common.GetAttributeValue(lastCMTerm, "pe_number"));
+                                    LLP.Common.SetAttributeValue(pe_contractmonitoringterm, "pe_lastboolean", LLP.Common.GetAttributeValue(lastCMTerm, "pe_boolean"));
+                                }
+
+                                pe_contractmonitoringterm.save(
+                                    function (err) {
+                                        if (err) {
+                                            LLP.LOG.Error(LLP.Enums.Module.ContractMonitoring, "CreateMonitoringTermLines -> callback: ", err);
+                                            error = true;
+                                        }
+                                    }
+                                );
+                            }
+                            catch (e) {
+                                error = true;
+                            }
+                        }
+
+                        if (!error) {
+                            if (postSaveHandler != null) {
+                                postSaveHandler.resumePostSave();
+                                return false;
+                            }
+                        }
+                        else {
+                            MobileCRM.bridge.alert("Error, post save skipped");
+                        }
+
+                        return false;
+                    },
+                    // Creating contract monitoring lines skipped
+                    function () {
+                        return false;
+                    });
+                } catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.ContractMonitoring, "CreateMonitoringTermLines: ", e);
+                }
+            },
+            SaveMonitoringContractTerms: function (entity, postSavehandler) {
+                try {
+                    if(ContractMonitoring.ContractMonitoringTermsToSave.length > 0) {
+                        var results = [];
+                        for(var i = 0; i < ContractMonitoring.ContractMonitoringTermsToSave.length; i++) {
+                            ContractMonitoring.ContractMonitoringTermsToSave[i].save(
+                                function (err) {
+                                    if (err) {
+                                        LLP.LOG.Error(LLP.Enums.Module.ContractMonitoring, "SaveMonitoringContractTerms -> callback: ", err);
+                                        results.push(true);
+                                    }
+                                    else {
+                                        results.push(false);
+                                    }
+
+                                    if (results.length == ContractMonitoring.ContractMonitoringTermsToSave.length) {
+                                        if (results.indexOf(true) < 0) {
+                                            ContractMonitoring.SetFinalResultToContractAndSave(entity, postSavehandler);
+                                        }
+                                        else {
+                                            MobileCRM.bridge.alert("Error in saving monitoring contract terms, post save skipped");
+                                        }
+                                    }
+                                }
+                            );
+                        }
+                    }
+                    else {
+                        postSavehandler.resumePostSave();
+                    }
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.ContractMonitoring, "SaveMonitoringContractTerms: ", e);
+                }
+            },
+            SetFinalResultToContractAndSave: function(contractMonitoring, postSavehandler) {
+                try {
+                    var pe_contractid = LLP.Common.GetAttributeValue(contractMonitoring, "pe_contractid");
+
+                    var xml =
+                            '<fetch>\
+		                        <entity name="pe_contractmonitoring">\
+                                    <attribute name="pe_finalresult" />\
+		                            <filter type="and">\
+			                            <condition attribute="pe_contractid" operator="eq" value="' + pe_contractid.id + '" />\
+		                            </filter>\
+		                        </entity>\
+	                        </fetch>';
+
+                    MobileCRM.FetchXml.Fetch.deserializeFromXml(xml, function (fetch) {
+                        fetch.execute("DynamicEntities", function (contractMonitorings) {
+
+                            var resultSum = 0;
+                            for (var i = 0; i < contractMonitorings.length; i++) {
+                                var value = LLP.Common.GetAttributeValue(contractMonitorings[i], "pe_finalresult");
+
+                                if(value) {
+                                    resultSum += value;
+                                }
+                            }
+
+                            MobileCRM.DynamicEntity.loadById("pe_contract", pe_contractid.id,
+                                function (result) {
+                                    LLP.Common.SetAttributeValue(result, "pe_finalcontractscore", contractMonitorings.length == 0 ? 0 : resultSum / contractMonitorings.length);
+                                    result.save(function (err) {
+                                        if (err) {
+                                            MobileCRM.bridge.alert("Error while saving final contracts score to contract " + result.primaryName);
+                                        }
+                                        else {
+                                            postSavehandler.resumePostSave();
+                                        }
+                                    });
+                                },
+                                function (error) {
+                                    LLP.LOG.Error(LLP.Enums.Module.ContractMonitoring, "SetFinalResultToContractAndSave: ", error);
+                                }, null)
+                        }, MobileCRM.bridge.alert);
+                    }, MobileCRM.bridge.alert);
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.ContractMonitoring, "SetFinalResultToContractAndSave: ", e);
+                }
+            },
+            FindLastAndSetValues: function () {
+                try {
+                    ContractMonitoring.LastContractMonitoringTerms = {};
+
+                    var pe_contractid = LLP.Common.Attribute_GetValue(ContractMonitoring.Enums.DisplayViewName.General, "pe_contractid");
+
+                    var xml =
+                            '<fetch>\
+		                        <entity name="pe_contractmonitoring">\
+                                    <attribute name="pe_contractmonitoringid" />\
+                                    <order attribute="createdon" descending="true" />\
+                                    <filter type="and">\
+			                            <condition attribute="pe_contractid" operator="eq" value="' + pe_contractid.id + '" />\
+		                            </filter>\
+		                        </entity>\
+	                        </fetch>';
+
+                    MobileCRM.FetchXml.Fetch.deserializeFromXml(xml, function (fetch) {
+                        fetch.execute("DynamicEntities", function (result) {
+                            if (result.length > 0) {
+                                var id = LLP.Common.GetAttributeValue(result[0], "pe_contractmonitoringid");
+                                ContractMonitoring.GetContractMonitoringTermsForLastCM(id);
+                            }
+                        }, MobileCRM.bridge.alert);
+                    }, MobileCRM.bridge.alert);
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.ContractMonitoringTerm, "FindLastAndSetValues", e);
+                }
+            },
+            GetContractMonitoringTermsForLastCM: function(pe_contractmonitoringid) {
+                try {
+                    var xml =
+                            '<fetch>\
+		                        <entity name="pe_contractmonitoringterm">\
+                                    <attribute name="pe_contracttermid" />\
+                                    <attribute name="pe_number" />\
+                                    <attribute name="pe_boolean" />\
+                                    <filter type="and">\
+                                        <condition attribute="pe_contractmonitoringid" operator="eq" value="' + pe_contractmonitoringid + '" />\
+                                        <condition attribute="statuscode" operator="eq" value="' + ContractMonitoring.Enums.TermStatusCode.Inactive + '" />\
+		                            </filter>\
+		                        </entity>\
+	                        </fetch>';
+
+                    MobileCRM.FetchXml.Fetch.deserializeFromXml(xml, function (fetch) {
+                        fetch.execute("DynamicEntities", function (result) {
+                            if (result.length > 0) {
+                                for (var i = 0; i < result.length; i++) {
+                                    var pe_contracttermid = LLP.Common.GetAttributeValue(result[i], "pe_contracttermid");
+                                    ContractMonitoring.LastContractMonitoringTerms[pe_contracttermid.id] = result[i];
+                                }
+                            }
+                        }, MobileCRM.bridge.alert);
+                    }, MobileCRM.bridge.alert);
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.ContractMonitoringTerm, "GetContractMonitoringTermsForLastCM", e);
+                }
+            },
+            SetEditability: function () {
+                try {
+                    LLP.Common.Attribute_Disabled(ContractMonitoring.Enums.DisplayViewName.General, "statuscode");
+                    LLP.Common.Attribute_Disabled(ContractMonitoring.Enums.DisplayViewName.General, "pe_finalresult");
+
+                    var statuscode = LLP.Common.Attribute_GetValue(ContractMonitoring.Enums.DisplayViewName.General, "statuscode");
+                    var disabled = statuscode != ContractMonitoring.Enums.StatusCode.Draft;
+                    var attributes = ["pe_name", "pe_contractid"];
+
+                    LLP.HtmlControl.SetDisabled("btnComplete", disabled);
+
+                    for (var i = 0; i < attributes.length; i++) {
+                        LLP.Common.Attribute_IsDisabled(ContractMonitoring.Enums.DisplayViewName.General, attributes[i], disabled);
+                    }
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.ContractMonitoring, "SetEditability", e);
+                }
+            },
+            SetCompleted: function() {
+                LLP.Common.Attribute_SetValue(ContractMonitoring.Enums.DisplayViewName.General, "statuscode", ContractMonitoring.Enums.StatusCode.Completed);
+            },
+            OnClick_Complete: function () {
+                try {
+                    MobileCRM.UI.EntityForm.requestObject(function (entityForm) {
+                        ContractMonitoring.SetToCompleted = true;
+                        if (!entityForm.isDirty) {
+                            LLP.SetExecutionContext(entityForm);
+                            ContractMonitoring.SetCompleted();
+                        }
+                        MobileCRM.UI.EntityForm.save();
+                    },
+                    function (error) {
+                        LLP.LOG.Error(LLP.Enums.Module.ContractMonitoring, "OnClick_Complete -> MobileCRM.UI.EntityForm.requestObject", error);
+                    }, null)
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.ContractMonitoring, "OnClick_Complete", e);
+                }
+            },
+            CalculateResult: function(entityForm, saveHandler) {
+                try {
+                    var statuscode = LLP.Common.Attribute_GetValue(ContractMonitoring.Enums.DisplayViewName.General, "statuscode");
+                    if (statuscode == ContractMonitoring.Enums.StatusCode.Completed || statuscode == ContractMonitoring.Enums.StatusCode.Cancelled) {
+                        ContractMonitoring.GetContractMonitoringTerms(entityForm.entity, function (contractMonitoringTerms) {
+                            ContractMonitoring.ContractMonitoringTerms = contractMonitoringTerms;
+                            ContractMonitoring.ContractMonitoringTermsToSave = [];
+                            ContractMonitoring.ContractTerms = [];
+                            var countLoaded = 0;
+
+                            for (var i = 0; i < ContractMonitoring.ContractMonitoringTerms.length; i++) {
+                                
+                                var contractTermId = LLP.Common.GetAttributeValue(contractMonitoringTerms[i], "pe_contracttermid").id;
+                                var contractTerm = {
+                                    ContractMonitoringTermId: ContractMonitoring.ContractMonitoringTerms[i].id,
+                                    ContractTermId: contractTermId,
+                                    ContractTerm: null
+                                };
+                                
+                                ContractMonitoring.ContractTerms.push(contractTerm);
+
+                                MobileCRM.DynamicEntity.loadById("pe_contractterm", contractTermId,
+                                    function (result) {
+                                        countLoaded++;
+                                        var obj = ContractMonitoring.GetContractTermById(result.id, false);
+                                        obj.ContractTerm = result;
+                                        var anyIsNull = false;
+
+                                        for (var i = 0; i < ContractMonitoring.ContractTerms.length; i++) {
+                                            if (!ContractMonitoring.ContractTerms[i].ContractTerm) {
+                                                ContractMonitoring.InvalidContractTerms = true;
+                                                break;
+                                            }
+                                        }
+                                        
+                                        if (countLoaded == ContractMonitoring.ContractMonitoringTerms.length) {
+                                            ContractMonitoring.SetResults(saveHandler);
+                                        }
+                                    },
+                                    function (error) {
+                                        LLP.LOG.Error(LLP.Enums.Module.ContractMonitoring, "OnChange_StatusCode -> loading pe_contractterm: ", error);
+                                    }, null);
+                            }
+                        });
+                    }
+                    else {
+                        LLP.Common.Attribute_Visibility(ContractMonitoring.Enums.DisplayViewName.General, "pe_finalresult", false);
+                        ContractMonitoring.ContractMonitoringTermsToSave = [];
+                        saveHandler.resumeSave();
+                    }
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.ContractMonitoring, "OnChange_StatusCode: ", e);
+                }
+            },
+            SetResults: function (saveHandler) {
+                try {
+                    MobileCRM.UI.EntityForm.requestObject(function (entityForm) {
+                        LLP.SetExecutionContext(entityForm);
+
+                        var results = [];
+                        ContractMonitoring.ContractMonitoringTermsToSave = [];
+
+                        var statuscode = LLP.Common.Attribute_GetValue(ContractMonitoring.Enums.DisplayViewName.General, "statuscode");
+
+                        for (var i = 0; i < ContractMonitoring.ContractMonitoringTerms.length; i++) {
+                            var contractMonitoringTerm = new MobileCRM.DynamicEntity("pe_contractmonitoringterm", ContractMonitoring.ContractMonitoringTerms[i].id);
+
+                            if (statuscode == ContractMonitoring.Enums.StatusCode.Completed) {
+                                switch (LLP.Common.GetAttributeValue(ContractMonitoring.ContractMonitoringTerms[i], "term.pe_fieldtype")) {
+                                    case ContractMonitoring.Enums.TermFieldType.Number:
+                                        var obj = ContractMonitoring.GetContractTermById(ContractMonitoring.ContractMonitoringTerms[i].id, true);
+                                        let res = false;
+                                        if (obj.ContractTerm) {
+                                            var pe_number = LLP.Common.GetAttributeValue(ContractMonitoring.ContractMonitoringTerms[i], "pe_number");
+                                            var contractTermNumber = LLP.Common.GetAttributeValue(obj.ContractTerm, "pe_number");
+                                            res = contractTermNumber >= pe_number;
+                                        }
+
+                                        LLP.Common.SetAttributeValue(contractMonitoringTerm, "pe_result", res);
+                                        results.push(res);
+                                        break;
+                                    default:
+                                        var pe_boolean = LLP.Common.GetAttributeValue(ContractMonitoring.ContractMonitoringTerms[i], "pe_boolean");
+                                        LLP.Common.SetAttributeValue(contractMonitoringTerm, "pe_result", pe_boolean);
+                                        results.push(pe_boolean);
+                                        break;
+                                }
+                            }
+
+                            //Task 4887
+                            LLP.Common.SetAttributeValue(contractMonitoringTerm, "statuscode", ContractMonitoring.Enums.TermStatusCode.Inactive);
+                            ContractMonitoring.ContractMonitoringTermsToSave.push(contractMonitoringTerm);
+                        }
+
+                        if (statuscode == ContractMonitoring.Enums.StatusCode.Completed) {
+                            var corretCount = 0;
+                            for (var i = 0; i < results.length; i++) {
+                                if (results[i]) {
+                                    corretCount++;
+                                }
+                            }
+
+                            LLP.Common.Attribute_SetValue(ContractMonitoring.Enums.DisplayViewName.General, "pe_finalresult", (results.length == 0 ? 0 : corretCount / results.length) * 100);
+                            LLP.Common.Attribute_Visibility(ContractMonitoring.Enums.DisplayViewName.General, "pe_finalresult", true);
+                        }
+
+                        saveHandler.resumeSave();
+                    },
+                    function (error) {
+                        LLP.LOG.Error(LLP.Enums.Module.ContractMonitoring, "OnChange_StatusCode -> GetContractMonitoringTerms callback", error);
+                    }, null);
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.ContractMonitoring, "SetResults: ", e);
+                }
+            },
+            GetContractTermById: function(id, isMonitoring) {
+                for(var i = 0; i < ContractMonitoring.ContractTerms.length; i++) {
+                    if (isMonitoring && ContractMonitoring.ContractTerms[i].ContractMonitoringTermId == id ||
+                        !isMonitoring && ContractMonitoring.ContractTerms[i].ContractTermId == id) {
+                        return ContractMonitoring.ContractTerms[i];
+                    }
+                }
+            },
+            // ON LOAD FORM
+            OnLoad: function () {
+                try {
+                    MobileCRM.UI.EntityForm.onSave(ContractMonitoring.OnSave, true, null);
+
+                    MobileCRM.UI.EntityForm.requestObject(
+                        function (entityForm) {
+                            try {
+                                
+                                var contract = LLP.Common.GetAttributeValue(entityForm.entity, "pe_contractid");
+
+                                LLP.Fetch.IsAttributeValue(contract,
+                                                             "statuscode",
+                                                             ContractMonitoring.Enums.ContractStatusCode.Draft,
+                                                             function (isSet) {
+
+                                                                 MobileCRM.UI.EntityForm.requestObject(function (entityForm) {
+                                                                     LLP.SetExecutionContext(entityForm);
+                                                                     if (isSet) {
+                                                                         ContractMonitoring.ContinueOnLoad(entityForm);
+                                                                     }
+                                                                     else {
+                                                                         LLP.Form.Disabled(true);
+                                                                         if (LLP.Form.IsCreate()) {
+                                                                             entityForm.setTabVisibility("Actions", !LLP.Form.IsCreate());
+                                                                             LLP.Common.Attribute_Invisible(ContractMonitoring.Enums.DisplayViewName.General, "statuscode");
+                                                                         }
+                                                                     }
+                                                                 },
+                                                                 function (error) {
+                                                                     LLP.LOG.Error(LLP.Enums.Module.ProductExchangeIssuedProduct, "OnLoad -> LLP.Fetch.IsAttributeValue -> callback -> MobileCRM.UI.EntityForm.requestObject", e);
+                                                                 }, null);
+
+                                                             });
+                            } catch (e) {
+                                LLP.LOG.Error(LLP.Enums.Module.ContractMonitoring, "OnLoad -> MobileCRM.UI.EntityForm.requestObject -> callback:", e);
+                            }
+                        },
+                        function (errorMessage) {
+                            LLP.LOG.Error(LLP.Enums.Module.ContractMonitoring, "OnLoad -> MobileCRM.UI.EntityForm.requestObject:", errorMessage);
+                        }
+                    );
+                    
+                    MobileCRM.UI.EntityForm.onPostSave(ContractMonitoring.OnPostSave, true, null);
+                } catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.ContractMonitoring, "OnLoad:", e);
+                }
+            },
+            ContinueOnLoad: function (entityForm) {
+                try {
+                    ContractMonitoring.SetEditability();
+
+                    if (LLP.Form.IsCreate()) {
+                        entityForm.setTabVisibility("Actions", !LLP.Form.IsCreate());
+                        LLP.Common.Attribute_Invisible(ContractMonitoring.Enums.DisplayViewName.General, "statuscode");
+                    } else {
+                        ContractMonitoring.CreateMonitoringTermLines(entityForm.entity);
+                    }
+
+                    LLP.Common.Attribute_Required(ContractMonitoring.Enums.DisplayViewName.General, "pe_name");
+                    LLP.Common.Attribute_Required(ContractMonitoring.Enums.DisplayViewName.General, "pe_contractid");
+
+                    var statuscode = LLP.Common.Attribute_GetValue(ContractMonitoring.Enums.DisplayViewName.General, "statuscode");
+                    LLP.Common.Attribute_Visibility(ContractMonitoring.Enums.DisplayViewName.General, "pe_finalresult", statuscode == ContractMonitoring.Enums.StatusCode.Completed);
+                    ContractMonitoring.FindLastAndSetValues();
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.ContractMonitoring, "ContinueOnLoad:", e);
+                }
+            },
+            OnSave: function (entityForm) {
+                LLP.SetExecutionContext(entityForm);
+                var saveHandler = entityForm.suspendSave();
+
+                if (ContractMonitoring.SetToCompleted) {
+                    ContractMonitoring.SetCompleted();
+                }
+
+                if (!LLP.Common.IsVisible(ContractMonitoring.Enums.DisplayViewName.General, "statuscode")) {
+                    LLP.Common.Attribute_Visible(ContractMonitoring.Enums.DisplayViewName.General, "statuscode");
+                }
+                ContractMonitoring.CalculateResult(entityForm, saveHandler);
+            },
+            OnPostSave: function (entityForm) {
+                var postSuspend = entityForm.suspendPostSave();
+                if (!ContractMonitoring.CreateMonitoringTermLines(entityForm.entity, postSuspend)) {
+                    ContractMonitoring.SaveMonitoringContractTerms(entityForm.entity, postSuspend);
+                }
+                ContractMonitoring.UpdateVisitActivity(ContractMonitoring.SetToCompleted, entityForm.entity)
+            },
+
+            UpdateVisitActivity: function (setToCompleted, entity)
+            {
+                try {
+                    var entityRef = new MobileCRM.Reference(entity.entityName, entity.id, entity.primaryName);
+                    var pe_VisitActivityRef = LLP.Common.GetAttributeValue(entity, "pe_visitactivityid");
+                    var pe_visitactivityEdit = new MobileCRM.DynamicEntity.createNew("pe_visitactivity");
+                    pe_visitactivityEdit.isNew = false;
+                    pe_visitactivityEdit.id = pe_VisitActivityRef.id;
+
+                    if (setToCompleted) {
+                        LLP.Common.SetAttributeValue(pe_visitactivityEdit, "pe_lastrun", new Date());
+                        LLP.Common.SetAttributeValue(pe_visitactivityEdit, "statuscode", 100000000); // completed
+                    }
+
+                    LLP.Common.SetAttributeValue(pe_visitactivityEdit, "pe_maotheroffid", entityRef);
+
+                    pe_visitactivityEdit.save(
+                         function (err)
+                         {
+                             if (err) {
+                                 LLP.LOG.Error(LLP.Enums.Module.MAOtherOff, "Error Save pe_visitactivityEdit -> callback: ", err);
+                             }
+                         }
+                    );
+
+
+                } catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.MAOtherOff, "OnPostSave", e);
+                }
+
+            }
+        };
+    </script>
+
+</body>
+</html>

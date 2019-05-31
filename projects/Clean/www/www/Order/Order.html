@@ -1,0 +1,1386 @@
+﻿<!DOCTYPE html>
+
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="utf-8" />
+    <title>Empty Offline HTML page</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="initial-scale=1, user-scalable=no" />
+    <script src="..\Common\JSBridge.js"></script>
+    <script src="..\Common\pe_GlobalCommonFunctions.js"></script>
+    <script src="..\Common\jquery-3.3.1.min.js"></script>
+    <script src="..\Common\popper.min.js"></script>
+    <script src="..\Common\bootstrap.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="..\Common\bootstrap.min.css">
+    <script src="OrderCampaignCompute.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div class="row"><p> </p></div>
+        <div class="row">
+            <div class="col">
+                <!--Generate Order Products-->
+                <button class="btn btn-primary btn-block" id="btnGenerateOrderProduct" onclick="Order.OnClick_GenerateOrderProduct();">Generate Order Products</button>
+            </div>
+        </div>
+        <div class="row"><p> </p></div>
+        <div class="row">
+            <div class="col">
+                <button class="btn btn-primary btn-block" id="btnRecalculateOrder" onclick="Order.OnClick_RefreshForm();">Recalculate Order</button>
+            </div>
+        </div>
+        <div class="row"><p> </p></div>
+        <div class="row">
+            <div class="col">
+                <button class="btn btn-primary btn-block" id="btnGenerateOrderProductForNewActivatedEnrollments" onclick="Order.OnClick_GenerateOrderProductForNewActiveEnrollment();">Generate New Activated Enrollment</button>
+            </div>
+        </div>
+        <div class="row"><p> </p></div>
+        <div class="row">
+            <div class="col">
+                <button class="btn btn-primary btn-block" id="btnPriceCheckCompleted" onclick="Order.OnClick_PriceCheckCompleted();">Price Check Completed</button>
+            </div>
+        </div>
+        <div class="row"><p> </p></div>
+        <div class="row">
+            <div class="col">
+                <button class="btn btn-primary btn-block" id="btnStoreCheckCompleted" onclick="Order.OnClick_StoreCheckCompleted();">Store Check Completed</button>
+            </div>
+        </div>
+        <div class="row"><p> </p></div>
+        <div class="row">
+            <div class="col">
+                <button class="btn btn-primary btn-block" id="btnCompleted" onclick="Order.OnClick_Completed();">Completed</button>
+            </div>
+        </div>
+        <div class="row"><p> </p></div>
+        <div class="row">
+            <div class="col">
+                <button class="btn btn-primary btn-block" id="btnCompaignInfo" onclick="Order.OnClick_CampaignInfo();">Campaign Info</button>
+            </div>
+        </div>
+    </div>
+    <label id="logLabel"></label>
+    <script>
+
+        //****************************************************************
+        //Task 5238
+        //pri kliknuti na tlacitko Recalculate Order, udelat tyto cinnost v poradi:
+        //    - ulozit vsechny radky, kde 
+        //    - prepocitat Total Ammout
+        //    - refreshnout Order (aby se zobrazila cena)
+        //********************************************************************************************************************
+        //Task 5365 |
+        //----------
+        //potřeboval bych u těchto entit napočítávat po stisknutí tlačítka completed počet řádků.
+        //tato hodnota se určitě přenese do CRM, ale nemusí se už přenést všechny řádky..
+        //- techto entit muze byt vice, princip a nazev pole bude vzdy stejny, tak se to da nejak treba usnadnit?
+
+        //    entita: salesorder
+        //    pole: pe_countofrelatedrows
+
+        //    entita: msdyn_workorder
+        //    pole: pe_countofrelatedrows
+
+        var Order = Order || {
+            CampaignsInfo:null,
+            PickListSetLevelOfSet: null,
+            IsSaving: false,
+            Enums: {
+                DetailName:
+                {
+                    General: "General",
+                },
+                PriceCheckStatusReason: {
+                    Draft: 100000000,
+                    Completed: 100000001,
+                    Active: 100000002,
+                    Inactive: 100000003,
+                },
+                StoreCheckStatusReason: {
+                    Draft: 100000000,
+                    Completed: 100000001,
+                    Cancelled: 100000002,
+                    Active: 100000003,
+                },
+                StatusCode: {
+                    Draft: 1,
+                    Complete: 100001,
+                    Partial: 100002,
+                    Invoiced: 100003,
+                    Pending: 2,
+                    InProgress: 3,
+                    NoMoney: 4,
+                    Onhold: 690970000,
+                    Completed: 690970001
+                }
+            },
+            SetToCompleted: false,
+            StartGeneratedOrderProductLoadPreviousOrderPriceCheck: function (entityForm, pe_accountid)
+            {    // najde posledni objednavku pro nacteni PriceCheck
+                try {
+                    var fetchXML =
+                        '<fetch> \
+                            <entity name="salesorder" >\
+                            <attribute name="salesorderid" />\
+                            <filter>\
+                                <condition attribute="pe_accountid" operator="eq" value="' + pe_accountid + '" />\
+                                <condition attribute="pe_pricecheckstatusreason" operator="eq" value="100000001" />\
+                            </filter>\
+                            <order attribute="pe_pricecheckcompletedon" descending="true" />\
+                            </entity>\
+                        </fetch>';
+
+                    MobileCRM.FetchXml.Fetch.deserializeFromXml(fetchXML, function (fetch)
+                    {
+                        fetch.count = 1;
+                        fetch.execute("DynamicEntities",
+                            function (result)
+                            {
+                                if (result && result.length > 0) {
+                                    var salesOrderId = result[0].id;
+                                    Order.LoadPreviousOrderProductPriceCheck(salesOrderId, entityForm, pe_accountid);
+                                } 
+                                else {
+                                    Order.LoadPreviousOrderProductPriceCheck(null, entityForm, pe_accountid);
+                                }
+                            },
+                            function (error)
+                            {
+                                LLP.LOG.Error(LLP.Enums.Module.Order, "Order.StartGeneratedOrderProductLoadPreviousOrderPriceCheck. fetchResult", error);
+                                MobileCRM.bridge.alert(error);
+                            }
+                        );
+
+                    }, MobileCRM.bridge.alert);
+
+                } catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Order, "Order.StartGeneratedOrderProductLoadPreviousOrderPriceCheck", e);
+                }
+            },
+
+            LoadPreviousOrderProductPriceCheck: function (previousSalesOrderPriceCheckId, entityForm, pe_accountid)
+            {
+                try {
+
+                    if (previousSalesOrderPriceCheckId) {
+                        var fetchXML =
+                            '<fetch> \
+                            <entity name="pe_orderproduct" > \
+                            <attribute name="pe_currentprice" />\
+                            <attribute name="pe_name" />\
+                            <attribute name="pe_productid" />\
+                            <filter>\
+                              <condition attribute="pe_campaignid" operator="null" />\
+                              <condition attribute="pe_orderid" operator="eq" value="' + previousSalesOrderPriceCheckId + '" />\
+                            </filter>\
+                          </entity>\
+                        </fetch>';
+
+                        MobileCRM.FetchXml.Fetch.deserializeFromXml(fetchXML, function (fetch)
+                        {
+                            fetch.execute("DynamicEntities",
+                                function (result)
+                                {
+                                    var previousProductPriceCheck = null;
+                                    if (result.length > 0) {
+                                        previousProductPriceCheck = result;
+                                    }
+
+
+                                    Order.LoadPreviousOrderStoreCheck(entityForm, pe_accountid, previousProductPriceCheck);
+                                },
+
+                                function (error)
+                                {
+                                    LLP.LOG.Error(LLP.Enums.Module.Order, "Order.GenerateProductFromEnrolment", error);
+                                    MobileCRM.bridge.alert(error);
+                                }
+                            );
+
+                        }, MobileCRM.bridge.alert);
+
+
+                    }
+                    else {
+                        Order.LoadPreviousOrderStoreCheck(entityForm, pe_accountid, null);
+                    }
+
+
+                } catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Order, "Order.LoadPreviousOrderProduct", e);
+                }
+            },
+
+            LoadPreviousOrderStoreCheck: function (entityForm, pe_accountid, previousProductPriceCheckList)
+            {    // najde posledni objednavku pro nacteni StoreCheck
+                 //pe_storecheckstatusreason == 100,000,001 (completed)
+                try {
+                    var fetchXML =
+                        '<fetch> \
+                            <entity name="salesorder" >\
+                            <attribute name="salesorderid" />\
+                            <filter>\
+                                <condition attribute="pe_accountid" operator="eq" value="' + pe_accountid + '" />\
+                                <condition attribute="pe_storecheckstatusreason" operator="eq" value="100000001" />\
+                            </filter>\
+                            <order attribute="pe_pricecheckcompletedon" descending="true" />\
+                            </entity>\
+                        </fetch>';
+
+                    MobileCRM.FetchXml.Fetch.deserializeFromXml(fetchXML, function (fetch)
+                    {
+                        fetch.count = 1;
+                        fetch.execute("DynamicEntities",
+                            function (result)
+                            {
+                                if (result && result.length > 0) {
+                                    var salesOrderStoreChechId = result[0].id;
+                                    Order.LoadPreviousOrderProductStoreCheck(salesOrderStoreChechId, previousProductPriceCheckList, entityForm, pe_accountid);
+                                }
+                                else {
+                                    Order.LoadPreviousOrderProductStoreCheck(null, previousProductPriceCheckList, entityForm, pe_accountid);
+                                }
+                            },
+                            function (error)
+                            {
+                                LLP.LOG.Error(LLP.Enums.Module.Order, "Order.StartGeneratedOrderProductLoadPreviousOrderStoreCheck. fetchResult", error);
+                                MobileCRM.bridge.alert(error);
+                            }
+                        );
+
+                    }, MobileCRM.bridge.alert);
+
+                } catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Order, "Order.StartGeneratedOrderProductLoadPreviousOrderStoreCheck", e);
+                }
+            },
+
+            LoadPreviousOrderProductStoreCheck: function (previousSalesOrderStoreCheckId, previousProductPriceCheckList, entityForm, pe_accountid)
+            {
+                try {
+
+                    if (previousSalesOrderStoreCheckId) {
+                        var fetchXML =
+                            '<fetch> \
+                            <entity name="pe_orderproduct" > \
+                            <attribute name="pe_quantityinstock" />\
+                            <attribute name="pe_name" />\
+                            <attribute name="pe_productid" />\
+                            <filter>\
+                              <condition attribute="pe_campaignid" operator="null" />\
+                              <condition attribute="pe_orderid" operator="eq" value="' + previousSalesOrderStoreCheckId + '" />\
+                            </filter>\
+                          </entity>\
+                        </fetch>';
+
+                        MobileCRM.FetchXml.Fetch.deserializeFromXml(fetchXML, function (fetch)
+                        {
+                            fetch.execute("DynamicEntities",
+                                function (result)
+                                {
+                                    var previousProductStoreCheckList = null;
+                                    if (result.length > 0) {
+                                        previousProductStoreCheckList = result;
+                                    }
+
+
+                                    Order.GenerateProductFromPriceList(entityForm, pe_accountid, previousProductPriceCheckList, previousProductStoreCheckList);
+                                },
+
+                                function (error)
+                                {
+                                    LLP.LOG.Error(LLP.Enums.Module.Order, "Order.LoadPreviousOrderProductStoreCheck", error);
+                                    MobileCRM.bridge.alert(error);
+                                }
+                            );
+
+                        }, MobileCRM.bridge.alert);
+
+
+                    }
+                    else {
+                        Order.GenerateProductFromPriceList(entityForm, pe_accountid, previousProductPriceCheckList, null);
+                    }
+
+
+                } catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Order, "Order.LoadPreviousOrderProductStoreCheck", e);
+                }
+            },
+
+
+
+            GenerateProductFromEnrollment: function (entityForm, pe_accountId, writeEndDate, filterDate)
+            {
+                try {
+                    var filterDateCondition = '';
+                    if (filterDate) {
+
+                        if (LLP.Common.IsNullOrEmpty(entityForm.entity.properties.pe_rowsgeneratedon)) {
+                            // nelze dogenerovavat pokud neprobehlo prvni generovani
+
+                            MobileCRM.bridge.alert("You must generated all product.");
+                            return;
+                        }
+
+
+                        var day = entityForm.entity.properties.pe_rowsgeneratedon.getDate();
+                        var month = entityForm.entity.properties.pe_rowsgeneratedon.getMonth() + 1;
+                        var year = entityForm.entity.properties.pe_rowsgeneratedon.getFullYear();
+                        var hours = entityForm.entity.properties.pe_rowsgeneratedon.getHours();
+                        var minutes = entityForm.entity.properties.pe_rowsgeneratedon.getMinutes();
+                        var seconds = entityForm.entity.properties.pe_rowsgeneratedon.getSeconds();
+                        // activatedate;
+                        filterDateCondition = '<condition attribute="pe_activatedon" operator="ge" value="' + month + '/' + day + '/' + year + ' ' + hours + ':' + minutes + ':' + seconds + '  " />';
+                    }
+
+                    var fetchXML =
+                        '<fetch> \
+                          <entity name="pe_sectionproduct" > \
+                            <attribute name="pe_productid" /> \
+                            <attribute name="pe_sectionid" /> \
+                            <link-entity name="pe_section" from="pe_sectionid" to="pe_sectionid" > \
+                              <link-entity name="pe_campaignsection" from="pe_sectionid" to="pe_sectionid" >  \
+                                <attribute name="pe_campaignid" alias="Campaing" /> \
+                                <link-entity name="campaign" from="campaignid" to="pe_campaignid" > \
+                                  <link-entity name="pe_enrollment" from="pe_campaignid" to="campaignid" > \
+                                    <attribute name="pe_enrollmentid" alias="EnrollmentId" /> \
+                                    <attribute name="pe_name" alias="EnrollmentName" /> \
+                                    <filter> \
+                                      <condition attribute="statecode" operator="eq" value="0" /> \
+                                      <condition attribute="statuscode" operator="eq" value="1" /> \
+                                      <condition attribute="pe_card" operator="neq" value="100000001" /> \
+                                      <condition attribute="pe_accountid" operator="eq" value="'+ pe_accountId + '" /> '
+                                      + filterDateCondition + '\
+                                    </filter> \
+                                  </link-entity> \
+                                </link-entity> \
+                              </link-entity> \
+                            </link-entity> \
+                            <link-entity name="product" from="productid" to="pe_productid" > \
+                              <attribute name="price" alias="ProductPrice"/> \
+                            </link-entity> \
+                          </entity> \
+                        </fetch>';
+
+                    MobileCRM.FetchXml.Fetch.deserializeFromXml(fetchXML, function (fetch)
+                    {
+                        fetch.execute("DynamicEntities",
+                            function (result)
+                            {
+                                if (result.length == 0 && filterDate) {
+                                    MobileCRM.bridge.alert("Thera are no new activated Enrollments.");
+                                    return;
+                                }
+
+
+                                var salesOrderRef = new MobileCRM.Reference(entityForm.entity.entityName, entityForm.entity.id, entityForm.entity.primaryName);
+
+                                Order.GenerateProductFromEnrollment_Callback(result, salesOrderRef, writeEndDate);
+                            },
+
+                            function (error)
+                            {
+                                LLP.LOG.Error(LLP.Enums.Module.Order, "Order.GenerateProductFromEnrolment", error);
+                                MobileCRM.bridge.alert(error);
+                            }
+                        );
+
+                    }, MobileCRM.bridge.alert);
+                } catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Order, "Order.GenerateProductFromEnrolment", e);
+                }
+            },
+
+            GenerateProductFromEnrollment_Callback: function (result, pe_OrderIdRef, writeEndDate)
+            {
+                try {
+                    var errorHandler = [];
+
+                    for (var i = 0; i < result.length; i++) {
+                        try {
+
+                            var price = LLP.Common.GetAttributeValue(result[i], "ProductPrice");
+
+                            if (LLP.Common.IsNullOrEmpty(price)) {
+                                price = null;
+                            }
+
+                            var pe_productid = LLP.Common.GetAttributeValue(result[i], "pe_productid");
+                            var pe_sectionid = LLP.Common.GetAttributeValue(result[i], "pe_sectionid");
+                            var pe_campaignid = LLP.Common.GetAttributeValue(result[i], "Campaing");
+                            var pe_enrollment = new MobileCRM.Reference(
+                                "pe_enrollment",
+                                LLP.Common.GetAttributeValue(result[i], "EnrollmentId"),
+                                LLP.Common.GetAttributeValue(result[i], "EnrollmentName")
+                            );
+
+                            var pe_NewOrderProduct = new MobileCRM.DynamicEntity.createNew("pe_orderproduct");
+
+                            LLP.Common.SetAttributeValue(pe_NewOrderProduct, "pe_orderid", pe_OrderIdRef);
+                            LLP.Common.SetAttributeValue(pe_NewOrderProduct, "pe_productid", pe_productid);
+                            LLP.Common.SetAttributeValue(pe_NewOrderProduct, "pe_enrollmentid", pe_enrollment);
+                            LLP.Common.SetAttributeValue(pe_NewOrderProduct, "pe_sectionid", pe_sectionid);
+                            LLP.Common.SetAttributeValue(pe_NewOrderProduct, "pe_priceperunit", price);
+                            LLP.Common.SetAttributeValue(pe_NewOrderProduct, "pe_campaignid", pe_campaignid);
+                            LLP.Common.SetAttributeValue(pe_NewOrderProduct, "pe_name", pe_productid.primaryName);
+
+                            pe_NewOrderProduct.save(
+                                function (err)
+                                {
+                                    if (err) {
+                                        errorHandler.push(true);
+                                        LLP.LOG.Error(LLP.Enums.Module.Order, "GenerateProductFromEnrollment_Callback -> Save row: ", err);
+                                    }
+                                    else {
+                                        errorHandler.push(false);
+                                    }
+
+                                    if (result.length == errorHandler.length) { // konec pruchodu
+                                        if (errorHandler.indexOf(true) == -1 && writeEndDate) {
+
+                                            Order.WriteGeneratedOnDate();
+
+                                            // datum zapis
+                                        }
+                                    }
+
+                                }
+                            );
+
+                        } catch (e) {
+                            LLP.LOG.Error(LLP.Enums.Module.Order, "Order.GenerateProductFromEnrollment_Callback. Error in for", e);
+                        }
+
+                    }
+
+
+                } catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Order, "Order.GenerateProductFromEnrollment_Callback", e);
+                }
+            },
+
+            WriteGeneratedOnDate: function ()
+            {
+                try {
+                    MobileCRM.UI.EntityForm.requestObject(
+                       function (entityForm)
+                       {
+                           LLP.SetExecutionContext(entityForm);
+                           LLP.Common.SetAttributeValue(entityForm.entity, "pe_rowsgeneratedon", new Date());
+                           //MobileCRM.UI.EntityForm.save
+                           entityForm.entity.save(
+
+                                function (err)
+                                {
+                                    if (err) {
+                                        LLP.LOG.Error(LLP.Enums.Module.Order, "GenerateProductFromPriceListSet_Callback -> Save row: ", err);
+                                    }
+                                    else {
+                                        MobileCRM.UI.EntityForm.refreshForm();
+                                        //provede se na on load Order.EnableGenerateOrederProductBtn(entityForm);
+                                    }
+
+                                });
+
+                       },
+                       function (errorMessage)
+                       {
+                           LLP.LOG.Error(LLP.Enums.Module.Order, "Order.WriteGeneratedOnDate: MobileCRM.UI.EntityForm.:", errorMessage);
+                       }
+                   );
+                } catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Order, "Order.WriteGeneratedOnDate: MobileCRM.UI.EntityForm.:", e);
+                }
+
+            },
+
+
+            // ziskam produkty z price listu
+            GenerateProductFromPriceList: function (entityForm, pe_accountId, previousProductPriceCheckList, previousProductStoreCheckList)
+            {
+
+                // nejdrive ziskam vsechny produkty naprimo v price listu
+                try {
+                    var fetchXML =
+                        '<fetch > \
+                          <entity name="product" > \
+                            <attribute name="name" /> \
+                            <attribute name="pe_maxpriceforpricecheck" /> \
+                            <attribute name="productid" /> \
+                            <attribute name="price" /> \
+                            <link-entity name="pe_pricelistproduct" from="pe_productid" to="productid" link-type="inner" >\
+                              <attribute name="pe_ordertaking" alias="pe_ordertaking" /> \
+                              <attribute name="pe_pricecheck" alias="pe_pricecheck" /> \
+                              <attribute name="pe_storecheck" alias="pe_storecheck" /> \
+                              <link-entity name="pricelevel" from="pricelevelid" to="pe_pricelistid" >\
+                                 <filter>\
+                                      <condition attribute="transactioncurrencyid" operator="eq" value="' + LLP.Common.GetAttributeValue(entityForm.entity, "transactioncurrencyid").id + '" />\
+                                 </filter>\
+                                <link-entity name="pe_pricelistaccount" from="pe_pricelistid" to="pricelevelid" >\
+                                  <filter>\
+                                    <condition attribute="pe_accountid" operator="eq" value="'+ pe_accountId + '" />\
+                                  </filter>\
+                                </link-entity>\
+                              </link-entity>\
+                            </link-entity>\
+                          </entity>\
+                        </fetch>';
+
+                    MobileCRM.FetchXml.Fetch.deserializeFromXml(fetchXML, function (fetch)
+                    {
+                        fetch.execute("DynamicEntities",
+                            function (result)
+                            {
+                                Order.GenerateProductFromPriceListSet(result, entityForm, pe_accountId, previousProductPriceCheckList, previousProductStoreCheckList);
+                            },
+
+                            function (error)
+                            {
+                                LLP.LOG.Error(LLP.Enums.Module.Order, "Order.GenerateProductFromEnrolment", e);
+                                MobileCRM.bridge.alert(error);
+                            }
+                        );
+
+                    }, MobileCRM.bridge.alert);
+                } catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Order, "Order.GenerateProductFromEnrolment", e);
+                }
+            },
+
+            // ziskam produkty z price listu v setu jako callback
+            GenerateProductFromPriceListSet: function (product, entityForm, pe_accountId, previousProductPriceCheckList, previousProductStoreCheckList)
+            {
+
+                try {
+
+                    var fetchXML =
+                        '<fetch>\
+                          <entity name="product" >\
+                            <attribute name="name" />\
+                            <attribute name="pe_maxpriceforpricecheck" /> \
+                            <attribute name="productid" /> \
+                            <attribute name="price" />\
+                            <link-entity name="pe_pricelistproduct" from="pe_productid" to="productid" link-type="inner" >\
+                              <attribute name="pe_pricelistproductsetid" alias="ProductSetId"/>\
+                              <attribute name="pe_ordertaking" alias="pe_ordertaking" /> \
+                              <attribute name="pe_pricecheck" alias="pe_pricecheck" /> \
+                              <attribute name="pe_storecheck" alias="pe_storecheck" /> \
+                              <link-entity name="pe_pricelistproductset" from="pe_pricelistproductsetid" to="pe_pricelistproductsetid" >\
+                                <attribute name="pe_levelofset" alias="LevelOfset"/>\
+                                <link-entity name="pe_pricelistset" from="pe_pricelistproductsetid" to="pe_pricelistproductsetid" >\
+                                  <link-entity name="pricelevel" from="pricelevelid" to="pe_pricelistid" >\
+                                    <filter>\
+                                      <condition attribute="transactioncurrencyid" operator="eq" value="' + LLP.Common.GetAttributeValue(entityForm.entity, "transactioncurrencyid").id + '" />\
+                                    </filter>\
+                                    <link-entity name="pe_pricelistaccount" from="pe_pricelistid" to="pricelevelid" >\
+                                      <filter>\
+                                        <condition attribute="pe_accountid" operator="eq" value="' + pe_accountId + '" />\
+                                      </filter>\
+                                    </link-entity>\
+                                  </link-entity>\
+                                </link-entity>\
+                              </link-entity>\
+                            </link-entity>\
+                          </entity>\
+                        </fetch>';
+
+                    MobileCRM.FetchXml.Fetch.deserializeFromXml(fetchXML, function (fetch)
+                    {
+                        fetch.execute("DynamicEntities",
+                            function (productSet)
+                            {
+                                var salesOrderRef = new MobileCRM.Reference(entityForm.entity.entityName, entityForm.entity.id, entityForm.entity.primaryName);
+
+                                Order.GenerateProductFromPriceListSet_Callback(productSet, product, salesOrderRef, pe_accountId, entityForm, previousProductPriceCheckList, previousProductStoreCheckList);
+                            },
+
+                            function (error)
+                            {
+                                LLP.LOG.Error(LLP.Enums.Module.Order, "Order.GenerateProductFromEnrolment=>fetch.execute", error);
+                                MobileCRM.bridge.alert(error);
+                            }
+                        );
+
+                    },
+                    function (error)
+                    {
+                        LLP.LOG.Error(LLP.Enums.Module.Order, "Order.GenerateProductFromEnrolment=>deserializeFromXml", error);
+                        MobileCRM.bridge.alert(error);
+
+
+                    });
+
+                } catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Order, "Order.GenerateProductFromEnrolment", e);
+                }
+            },
+
+            GenerateProductFromPriceListSet_Callback: function (productSet, product, pe_OrderIdRef, pe_accountid, entityForm, previousProductPriceCheckList, previousProductStoreCheckList)
+            {
+                try {
+
+                    //provedu sum distinct podle pravidel
+                    for (var i = 0;  i < productSet.length; i++) {
+                        product = Order.AddProductToAllProductList(productSet[i], product);
+                    }
+
+
+                    var errorCount = [];
+
+                    if (product.length == 0)
+                    {
+                        // jeste je potreba generoval produkty dle enrollment
+                        Order.GenerateProductFromEnrollment(entityForm, pe_accountid, true, false);
+                        true;
+                    }
+
+                    for (var i = 0; i < product.length; i++) {
+                        try {
+
+                            var price = LLP.Common.GetAttributeValue(product[i], "price");
+
+                            if (LLP.Common.IsNullOrEmpty(price)) {
+                                // pro odstraneni undefined
+                                price = null;
+                            }
+
+                            var pe_productid = new MobileCRM.Reference("product", product[i].id, product[i].primaryName);
+                            var maxoflevelsofsets = LLP.Common.GetAttributeValue(product[i], "LevelOfset");
+                            var pe_fromsets = LLP.Common.GetAttributeValue(product[i], "pe_fromsets");
+                            var pe_pricecheck = LLP.Common.GetAttributeValue(product[i], "pe_pricecheck");
+                            var pe_storecheck = LLP.Common.GetAttributeValue(product[i], "pe_storecheck");
+                            var pe_ordertaking = LLP.Common.GetAttributeValue(product[i], "pe_ordertaking");
+                            var pe_pricecheckmaximumprice = LLP.Common.GetAttributeValue(product[i], "pe_maxpriceforpricecheck");
+
+                            
+                            var pe_currentprice = Order.FindCurrentPriceForProductPriceCheck(product[i].id, previousProductPriceCheckList);
+
+                            if (LLP.Common.IsNullOrEmpty(pe_currentprice))
+                            {
+                                pe_currentprice = null;
+                            }
+
+
+                            var pe_storechecklastquantity = Order.FindCurrentPriceForProductStoreCheck(product[i].id, previousProductStoreCheckList);
+                            if (LLP.Common.IsNullOrEmpty(pe_storechecklastquantity)) {
+                                pe_storechecklastquantity = null;
+                            }
+
+
+
+                            var pe_NewOrderProduct = new MobileCRM.DynamicEntity.createNew("pe_orderproduct");
+
+                            LLP.Common.SetAttributeValue(pe_NewOrderProduct, "pe_orderid", pe_OrderIdRef);
+                            LLP.Common.SetAttributeValue(pe_NewOrderProduct, "pe_productid", pe_productid);
+                            LLP.Common.SetAttributeValue(pe_NewOrderProduct, "pe_priceperunit", price);
+                            LLP.Common.SetAttributeValue(pe_NewOrderProduct, "pe_fromsets", pe_fromsets);
+                            LLP.Common.SetAttributeValue(pe_NewOrderProduct, "pe_name", pe_productid.primaryName);
+                            LLP.Common.SetAttributeValue(pe_NewOrderProduct, "pe_maxoflevelsofsets", maxoflevelsofsets);
+
+                            LLP.Common.SetAttributeValue(pe_NewOrderProduct, "pe_storechecklastquantity", pe_storechecklastquantity);
+
+                            LLP.Common.SetAttributeValue(pe_NewOrderProduct, "pe_pricecheck", pe_pricecheck);
+                            LLP.Common.SetAttributeValue(pe_NewOrderProduct, "pe_ordertaking", pe_ordertaking);
+                            LLP.Common.SetAttributeValue(pe_NewOrderProduct, "pe_storecheck", pe_storecheck);
+                            LLP.Common.SetAttributeValue(pe_NewOrderProduct, "pe_pricecheckmaximumprice", pe_pricecheckmaximumprice);
+                            LLP.Common.SetAttributeValue(pe_NewOrderProduct, "pe_currentprice", pe_currentprice);
+                            LLP.Common.SetAttributeValue(pe_NewOrderProduct, "pe_pricechecklastprice", pe_currentprice);
+
+
+                            pe_NewOrderProduct.save(
+                                function (err)
+                                {
+                                    if (err) {
+                                        errorCount.push(true);
+                                        LLP.LOG.Error(LLP.Enums.Module.Order, "GenerateProductFromPriceListSet_Callback -> Save row: ", err);
+                                    }
+                                    else {
+                                        errorCount.push(false);
+                                    }
+
+                                    if (product.length == errorCount.length) { // konec pruchodu
+                                        var writeEndDate = errorCount.indexOf(true) == -1;
+                                        // jeste je potreba generoval produkty dle enrollment
+                                        Order.GenerateProductFromEnrollment(entityForm, pe_accountid, writeEndDate, false);
+                                    }
+                                }
+                            );
+
+                        } catch (e) {
+                            LLP.LOG.Error(LLP.Enums.Module.Order, "Order.GenerateProductFromEnrollment_Callback. Error in for", e);
+                        }
+                    }
+                } catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Order, "Order.GenerateProductFromEnrollment_Callback", e);
+                }
+            },
+
+
+            FindCurrentPriceForProductPriceCheck: function(productId, previousProduct)
+            {
+                try {
+                    for (var i = 0; i < previousProduct.length; i++) {
+
+                        var previousProductId = LLP.Common.GetAttributeValue(previousProduct[i],"pe_productid");
+
+                        if (!LLP.Common.IsNullOrEmpty(previousProductId)) {
+
+                            if (previousProductId.id == productId) {
+                                return LLP.Common.GetAttributeValue(previousProduct[i], "pe_currentprice");
+                            }
+                        }
+                    }
+                    return null;
+                } catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Order, "Order.FindCurrentPriceForProduct.", e);
+                    return null;
+                }
+            },
+
+            FindCurrentPriceForProductStoreCheck: function (productId, previousProduct)
+            {
+                try {
+                    for (var i = 0; i < previousProduct.length; i++) {
+
+                        var previousProductId = LLP.Common.GetAttributeValue(previousProduct[i], "pe_productid");
+
+                        if (!LLP.Common.IsNullOrEmpty(previousProductId)) {
+
+                            if (previousProductId.id == productId) {
+
+                                return LLP.Common.GetAttributeValue(previousProduct[i], "pe_quantityinstock");
+                            }
+                        }
+                    }
+                    return null;
+                } catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Order, "Order.FindCurrentPriceForProduct.", e);
+                    return null;
+                }
+            },
+
+            AddProductToAllProductList: function (product, productList)
+            {
+                // pridame produkt do product listu
+                // pokud tam je prehodnotime jeho level a pokud je v setu tak taky jeho setname
+                try {
+
+                    var add = true;
+                    for (var i = 0; i < productList.length; i++) {
+                        if (product.id == productList[i].id) {
+                            // update LevelOfset
+                            productList[i] = Order.UpdateLevelOfset(productList[i], product);
+                            // update Set name
+                            productList[i] = Order.UpdatepeFromSetName(productList[i], product);
+
+                            // update pe_ordertaking
+                            productList[i] = Order.UpdateCheckBox(productList[i], product, "pe_ordertaking");
+
+                            //pe_storecheck
+                            productList[i] = Order.UpdateCheckBox(productList[i], product, "pe_storecheck");
+
+                            // update pe_pricecheck
+                            productList[i] = Order.UpdateCheckBox(productList[i], product, "pe_pricecheck");
+                            add = false;
+                            break;
+                        }
+                    }
+
+                    if (add) {
+                        // je potreba prevest From Set i prvnimu
+                        product = Order.UpdatepeFromSetName(product, product);
+                        productList.push(product);
+                    }
+
+                    return productList;
+
+                } catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Order, "Order.AddProductToAllProductList", e);
+                }
+            },
+
+          
+
+            UpdateLevelOfset: function (productOfList, product)
+            {
+                try {
+
+
+                    var levelOfsetList = LLP.Common.GetAttributeValue(productOfList, "LevelOfset");
+                    var levelOfset = LLP.Common.GetAttributeValue(product, "LevelOfset");
+
+                    if (LLP.Common.IsNullOrEmpty(levelOfsetList) && LLP.Common.IsNullOrEmpty(levelOfset)) {   // oba jsou null vracim list
+                        return productOfList;
+                    }
+
+                    if (!LLP.Common.IsNullOrEmpty(levelOfsetList) && LLP.Common.IsNullOrEmpty(levelOfset)) {
+                        // List neni null produkt je null vraciim rovnou list
+                        return productOfList;
+                    }
+
+                    if (LLP.Common.IsNullOrEmpty(levelOfsetList) && !LLP.Common.IsNullOrEmpty(levelOfset)) {
+                        //list je null tak jenom pridam to co je v produktu a vracim list
+                        LLP.Common.SetAttributeValue(productOfList, "LevelOfset", levelOfset);
+                        return productOfList;
+                    }
+
+                    if (!LLP.Common.IsNullOrEmpty(levelOfsetList) && !LLP.Common.IsNullOrEmpty(levelOfset)) {
+                        //list neni null tak updatuju pouze pokud je produkt mensi ne list
+                        if (levelOfset < levelOfsetList) {
+                            LLP.Common.SetAttributeValue(productOfList, "LevelOfset", levelOfset);
+                        }
+                        return productOfList;
+                    }
+
+                    return productOfList;
+
+                } catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Order, "Order.UpdateLevelOfset", e);
+                }
+            },
+
+            UpdatepeFromSetName: function (productOfList, product)
+            {
+                try {
+
+
+
+                    var fromSetObject = LLP.Common.GetAttributeValue(product, "ProductSetId");
+
+                    if (LLP.Common.IsNullOrEmpty(fromSetObject)) {
+                        // neni tam set vracim list
+                        return productOfList;
+                    }
+
+                    var fromSetList = LLP.Common.GetAttributeValue(productOfList, "pe_fromsets");
+                    var fromSetProduct = fromSetObject.primaryName;
+
+                    if (LLP.Common.IsNullOrEmpty(fromSetList) && LLP.Common.IsNullOrEmpty(fromSetProduct)) {
+                        // oba jsou null vracim list
+                        return productOfList;
+                    }
+
+                    if (!LLP.Common.IsNullOrEmpty(fromSetList) && LLP.Common.IsNullOrEmpty(fromSetProduct)) {
+                        // List neni null a produkt je null vraciim rovnou list
+                        return productOfList;
+                    }
+
+                    if (LLP.Common.IsNullOrEmpty(fromSetList) && !LLP.Common.IsNullOrEmpty(fromSetProduct)) {
+                        //list je null tak jenom pridam to co je v produktu a vracim list
+                        var levelOfset = LLP.Common.GetAttributeValue(product, "LevelOfset");
+                        var setName = fromSetProduct + ' (' + Order.LevelOfsetToText(levelOfset) + ')';
+                        LLP.Common.SetAttributeValue(productOfList, "pe_fromsets", setName);
+                        return productOfList;
+                    }
+
+                    if (!LLP.Common.IsNullOrEmpty(fromSetList) && !LLP.Common.IsNullOrEmpty(fromSetProduct)) {
+
+                        var levelOfset = LLP.Common.GetAttributeValue(product, "LevelOfset");
+                        var setName = fromSetProduct + ' (' + Order.LevelOfsetToText(levelOfset) + ')';
+                        //je potreba pridat do stringu ale radit
+
+                        var list = fromSetList.split(',');
+                        list.push(setName);
+                        list.sort();
+
+                        var fromsetnames = '';
+                        for (var i = 0; i < list.length; i++) {
+                            if (i > 0) {
+                                fromsetnames = fromsetnames + ', ';
+                            }
+                            fromsetnames = fromsetnames + list[i].trim();
+                        }
+
+                        LLP.Common.SetAttributeValue(productOfList, "pe_fromsets", fromsetnames);
+                        return productOfList;
+                    }
+
+                    return productOfList;
+
+                } catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Order, "Order.UpdateLevelOfset", e);
+                }
+            },
+
+            LevelOfsetToText: function (levelOfsetValue)
+            {
+                try {
+                    switch (levelOfsetValue) {
+                        case 100000000:
+                            return 'Mandatory';
+                        case 100000001:
+                            return 'Recommended';
+                        case 100000002:
+                            return 'New';
+                        default: levelOfsetValue;
+                    }
+                } catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Order, "Order.LevelOfsetToText", e);
+                }
+
+            },
+
+            UpdateCheckBox: function (productOfList, product, fieldName)
+            {
+                try {
+
+
+                    var checkOfList = LLP.Common.GetAttributeValue(productOfList, fieldName);
+                    var checkObject = LLP.Common.GetAttributeValue(product, fieldName);
+
+                    if (LLP.Common.IsNullOrEmpty(checkOfList) && LLP.Common.IsNullOrEmpty(checkObject)) {
+                        // oba jsou null vracim list
+                        return productOfList;
+                    }
+
+                    if (!LLP.Common.IsNullOrEmpty(checkOfList) && LLP.Common.IsNullOrEmpty(checkObject)) {
+                        // List neni null produkt je null vraciim rovnou list
+                        return productOfList;
+                    }
+
+                    if (LLP.Common.IsNullOrEmpty(checkOfList) && !LLP.Common.IsNullOrEmpty(checkObject)) {
+                        //list je null tak jenom pridam to co je v produktu a vracim list
+                        LLP.Common.SetAttributeValue(productOfList, fieldName, checkObject);
+                        return productOfList;
+                    }
+
+                    if (!LLP.Common.IsNullOrEmpty(checkOfList) && !LLP.Common.IsNullOrEmpty(checkObject)) {
+                        //list neni null tak updatuju pouze pokud je v listu neni true
+                        if (checkOfList != true) {
+                            LLP.Common.SetAttributeValue(productOfList, fieldName, checkObject);
+                        }
+                        return productOfList;
+                    }
+
+                    return productOfList;
+
+                } catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Order, "Order.UpdateCheckBox", e);
+                }
+            },
+
+            EnableGenerateOrederProductBtn: function (entityForm)
+            {
+                try {
+                    if (LLP.Common.IsNullOrEmpty(entityForm.entity.properties.pe_accountid)) {
+                        // neni account neni komu generovat
+                        Order.DisabledHtmlControl("btnGenerateOrderProduct");
+                        Order.DisabledHtmlControl("btnGenerateOrderProductForNewActivatedEnrollments");
+                        Order.DisabledHtmlControl("btnPriceCheckCompleted");
+                        return;
+                    }
+
+
+                    if (!LLP.Common.IsNullOrEmpty(entityForm.entity.properties.pe_rowsgeneratedon)) {
+                        Order.DisabledHtmlControl("btnGenerateOrderProduct");
+                        LLP.HtmlControl.SetDisabled("btnGenerateOrderProductForNewActivatedEnrollments", false);
+                    }
+                    else {
+                        LLP.HtmlControl.SetDisabled("btnGenerateOrderProduct", false);
+                        Order.DisabledHtmlControl("btnGenerateOrderProductForNewActivatedEnrollments");
+                    }
+
+                } catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Order, "Order.EnableGenerateOrederProductBtn", e);
+                }
+            },
+
+            DisabledHtmlControl: function (htmlControlId)
+            {
+                try {
+                    var htmlControl = document.getElementById(htmlControlId);
+                    htmlControl.setAttribute('disabled', 'disabled');
+
+                } catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Order, "Order.DisabledHtmlControl", e)
+                }
+            },
+
+            EnabledHtmlControl: function (htmlControlId)
+            {
+                try {
+                    var htmlControl = document.getElementById(htmlControlId);
+                    htmlControl.attributes.removeNamedItem("disabled");
+
+                } catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Order, "Order.EnableddHtmlControl", e)
+                }
+            },
+            GetDate: function(date) {
+                return Order.SliceNumber(date.getDate()) + "." + Order.SliceNumber(date.getMonth() + 1) + "." + date.getFullYear() + " " + Order.SliceNumber(date.getHours()) + ":" + Order.SliceNumber(date.getMinutes()) + ":" + Order.SliceNumber(date.getSeconds());
+            },
+            SliceNumber: function(number) {
+                return ("0" + number).slice(-2)
+            },
+            SetButtonsSate: function(entityForm) {
+                try {
+
+                    var buttonIds = ["btnGenerateOrderProduct", "btnRecalculateOrder", "btnGenerateOrderProductForNewActivatedEnrollments", "btnPriceCheckCompleted", "btnStoreCheckCompleted", "btnCompleted"];
+                    
+                    var generateOrdersDisabled = LLP.HtmlControl.IsDisabled("btnGenerateOrderProduct");
+                    var pe_pricecheckcompletedon = LLP.Common.GetAttributeValue(entityForm.entity, "pe_pricecheckcompletedon");
+                    var pe_pricecheckstatusreason = LLP.Common.GetAttributeValue(entityForm.entity, "pe_pricecheckstatusreason");
+                    var statuscode = LLP.Common.GetAttributeValue(entityForm.entity, "statuscode");
+
+                    if (statuscode == Order.Enums.StatusCode.Completed) {
+                        for (var i = 0; i < buttonIds.length; i++) {
+                            LLP.HtmlControl.SetDisabled(buttonIds[i], true);
+                        }
+
+                        LLP.Form.Disabled(true);
+                        MobileCRM.bridge.raiseGlobalEvent(LLP.GlobalEvents.OrderCompleted, null);
+                        return;
+                    }
+                    else {
+                        LLP.Common.Attribute_Enabled(Order.Enums.DetailName.General, "pe_accountid");
+                        LLP.Common.Attribute_Enabled(Order.Enums.DetailName.General, "pe_distributorid");
+                    }
+
+                    if (generateOrdersDisabled && !pe_pricecheckcompletedon && pe_pricecheckstatusreason != Order.Enums.PriceCheckStatusReason.Completed &&
+                        statuscode != Order.Enums.StatusCode.Completed) {
+                        LLP.HtmlControl.SetDisabled("btnPriceCheckCompleted", false);
+                    }
+                    else {
+                        Order.DisabledHtmlControl("btnPriceCheckCompleted");
+                    }
+
+                    var pe_storecheckcompletedon = LLP.Common.GetAttributeValue(entityForm.entity, "pe_storecheckcompletedon");
+                    var pe_storecheckstatusreason = LLP.Common.GetAttributeValue(entityForm.entity, "pe_storecheckstatusreason");
+
+                    if (generateOrdersDisabled && !pe_storecheckcompletedon && pe_storecheckstatusreason != Order.Enums.StoreCheckStatusReason.Completed &&
+                        statuscode != Order.Enums.StatusCode.Completed) {
+                        LLP.HtmlControl.SetDisabled("btnStoreCheckCompleted", false);
+                    }
+                    else {
+                        Order.DisabledHtmlControl("btnStoreCheckCompleted");
+                    }
+
+                    if (LLP.Form.IsCreate()) {
+                        LLP.HtmlControl.SetDisabled("btnCompleted", true);
+                    }
+                    else {
+                        Order.CheckIfProductsExists(entityForm);
+                    }
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Order, "Order.SetButtonsSate", e)
+                }
+            },
+            CheckIfProductsExists: function(entityForm) {
+                try {
+                    var xml =
+                            '<fetch>\
+		                        <entity name="pe_orderproduct">\
+                                    <attribute name="pe_orderproductid" />\
+		                            <filter type="and">\
+			                            <condition attribute="pe_orderid" operator="eq" value="' + entityForm.entity.id + '" />\
+		                            </filter>\
+		                        </entity>\
+	                        </fetch>';
+
+                    MobileCRM.FetchXml.Fetch.deserializeFromXml(xml, function (fetch) {
+                        fetch.execute("DynamicEntities", function (result) {
+                            LLP.HtmlControl.SetDisabled("btnCompleted", result.length == 0);
+                        }, MobileCRM.bridge.alert);
+                    }, MobileCRM.bridge.alert);
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Order, "Order.CheckIfProductsExists", e)
+                }
+            },
+            OnClick_GenerateOrderProduct: function ()
+            {
+                try {
+                    MobileCRM.UI.EntityForm.requestObject(
+                         function (entityForm)
+                         {
+                             try {
+
+                                 LLP.SetExecutionContext(entityForm);
+                                 var pe_accountid = LLP.Common.GetAttributeValue(entityForm.entity, "pe_accountid");
+
+                                 Order.StartGeneratedOrderProductLoadPreviousOrderPriceCheck(entityForm, pe_accountid.id);
+
+
+                             } catch (e) {
+                                 LLP.LOG.Error(LLP.Enums.Module.Order, "GenerateOrderProduct -> MobileCRM.UI.EntityForm.requestObject -> callback:", e);
+                             }
+                         },
+                         function (errorMessage)
+                         {
+                             LLP.LOG.Error(LLP.Enums.Module.Order, "GenerateOrderProduct -> MobileCRM.UI.EntityForm.requestObject:", errorMessage);
+                         }
+                     );
+
+                } catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Order, "Order.GenerateOrderProduct", e);
+                }
+            },
+
+            OnClick_GenerateOrderProductForNewActiveEnrollment: function ()
+            {
+                try {
+
+
+                    MobileCRM.UI.EntityForm.requestObject(
+                      function (entityForm)
+                      {
+                          var pe_accountid = LLP.Common.GetAttributeValue(entityForm.entity, "pe_accountid");
+                          Order.GenerateProductFromEnrollment(entityForm, pe_accountid.id, true, true);
+                      },
+                      function (errorMessage)
+                      {
+                          LLP.LOG.Error(LLP.Enums.Module.Order, "Order.GenerateOrderProductForNewActiveEnrollment: MobileCRM.UI.EntityForm.:", errorMessage);
+                      }
+                  );
+
+                } catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Order, "Order.GenerateOrderProductForNewActiveEnrollment", e);
+                }
+            },
+
+            OnClick_PriceCheckCompleted: function ()
+            {
+                try {
+
+                    MobileCRM.UI.EntityForm.requestObject(
+                     function (entityForm)
+                     {
+                         LLP.SetExecutionContext(entityForm);
+                         LLP.Common.SetAttributeValue(entityForm.entity, "pe_pricecheckstatusreason", Order.Enums.PriceCheckStatusReason.Completed);
+                         LLP.Common.SetAttributeValue(entityForm.entity, "pe_pricecheckcompletedon", new Date());
+                         entityForm.entity.save(
+
+                              function (err)
+                              {
+                                  if (err) {
+                                      LLP.LOG.Error(LLP.Enums.Module.Order, "GenerateProductFromPriceListSet_Callback -> Save row: ", err);
+                                  }
+                                  else {
+                                      MobileCRM.UI.EntityForm.refreshForm();
+                                  }
+                              });
+                     },
+                     function (errorMessage)
+                     {
+                         LLP.LOG.Error(LLP.Enums.Module.Order, "Order.WriteGeneratedOnDate: MobileCRM.UI.EntityForm.:", errorMessage);
+                     }
+                 );
+
+                } catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Order, "Order.PriceCheckCompleted", e);
+                }
+            },
+
+            OnClick_StoreCheckCompleted: function () {
+                try {
+
+                    MobileCRM.UI.EntityForm.requestObject(
+                     function (entityForm) {
+                         LLP.SetExecutionContext(entityForm);
+                         LLP.Common.SetAttributeValue(entityForm.entity, "pe_storecheckstatusreason", Order.Enums.StoreCheckStatusReason.Completed);
+                         LLP.Common.SetAttributeValue(entityForm.entity, "pe_storecheckcompletedon", new Date());
+                         entityForm.entity.save(
+
+                              function (err) {
+                                  if (err) {
+                                      LLP.LOG.Error(LLP.Enums.Module.Order, "OnClick_StoreCheckCompleted -> entityForm.entity.save", err);
+                                  }
+                                  else {
+                                      MobileCRM.UI.EntityForm.refreshForm();
+                                  }
+                              });
+                     },
+                     function (errorMessage) {
+                         LLP.LOG.Error(LLP.Enums.Module.Order, "Order.OnClick_StoreCheckCompleted -> MobileCRM.UI.EntityForm", errorMessage);
+                     }
+                 );
+
+                } catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Order, "Order.OnClick_StoreCheckCompleted", e);
+                }
+            },
+
+            OnClick_RefreshForm: function ()
+            {
+                try {
+                  
+                    MobileCRM.UI.EntityForm.requestObject(
+                      function (entityForm)
+                      {
+                          LLP.SetExecutionContext(entityForm);
+                          
+                          var orderId = entityForm.entity.id;
+                          var accountId = entityForm.entity.properties.pe_accountid;
+                          OrderCampaign.RecalculateVoucherToCampaign(orderId,accountId,Order.SetCampaingInfoList);
+                          
+                      },
+                      function (errorMessage)
+                      {
+                          LLP.LOG.Error(LLP.Enums.Module.Order, "Order.OnClick_RefreshForm: MobileCRM.UI.EntityForm.:", errorMessage);
+                      }
+                  );
+                    
+                  MobileCRM.bridge.raiseGlobalEvent(LLP.GlobalEvents.OrderProductAllProductsRecalculate, null);
+
+                } catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Order, "Order.RefreshForm", e);
+                }
+            },
+
+            SetCampaingInfoList: function(definitionList)
+            {
+                try {
+
+                    Order.CampaignsInfo = definitionList;
+                    LLP.HtmlControl.SetDisabled("btnCompaignInfo");
+                } catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Order, "Order.SetDefinitionList", e);
+                }
+            },
+
+            SetCompleted: function(entityForm) {
+                LLP.Common.SetAttributeValue(entityForm.entity, "statuscode", Order.Enums.StatusCode.Completed);
+            },
+            OnClick_Completed: function() {
+                try {
+                    Order.SetToCompleted = true;
+                    MobileCRM.UI.EntityForm.requestObject(function (entityForm) {
+                        if (!entityForm.isDirty) {
+                            Order.SetCompleted(entityForm);
+                        }
+                        
+                        MobileCRM.UI.EntityForm.save();
+
+                    },
+                    function (error) {
+                        LLP.LOG.Error(LLP.Enums.Module.Order, "Order.OnClick_Completed -> MobileCRM.UI.EntityForm.requestObject", error);
+                    }, null);
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Order, "Order.OnClick_Completed", e);
+                }
+            },
+
+            OnClick_CampaignInfo: function()
+            {
+                try {
+                    MobileCRM.UI.IFrameForm.showModal("Campaign Info", "file://www/Order/OrderCampaingInfo.html", null);
+                } catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Order, "Order.OnClick_CampaignInfo", e);
+                }
+            },
+
+            OnLoad: function ()
+            {
+                try {
+                    Order.DisabledHtmlControl("btnCompaignInfo");
+
+                    //proto je zde nutne zaregistrovat globalni udalost a provolat se ze survey
+                    MobileCRM.bridge.onGlobalEvent("CampaignInfoGet", function (args)
+                    {
+                        MobileCRM.bridge.raiseGlobalEvent("CampaignInfoSet", Order.CampaignsInfo);
+
+                    }, true);
+
+                    MobileCRM.bridge.onGlobalEvent(LLP.GlobalEvents.OrderProductAllProductsRowSave, function (args) {
+                        MobileCRM.UI.EntityForm.requestObject(function (entityForm) {
+                            if (Order.IsSaving) {
+                                return;
+                            }
+
+                            MobileCRM.UI.EntityForm.refreshForm();
+                        },
+                        function (error) {
+                            LLP.LOG.Error(LLP.Enums.Module.Order, "Order.OnLoad -> LLP.GlobalEvents.OrderProductAllProductsRowSave -> MobileCRM.UI.EntityForm.requestObject", error);
+                        }, null);
+                        
+                    }, true);
+
+                    MobileCRM.UI.EntityForm.onSave(Order.OnSave, true, null);
+                    MobileCRM.UI.EntityForm.onPostSave(Order.OnPostSave, true, null);
+                    MobileCRM.UI.EntityForm.requestObject(
+                        function (entityForm)
+                        {
+                            LLP.SetExecutionContext(entityForm);
+                            Order.EnableGenerateOrederProductBtn(entityForm);
+                            
+
+                            LLP.Common.Attribute_Disabled(Order.Enums.DetailName.General, "pe_pricecheckstatusreason");
+                            LLP.Common.Attribute_Disabled(Order.Enums.DetailName.General, "pe_storecheckstatusreason");
+                            LLP.Common.Attribute_Disabled(Order.Enums.DetailName.General, "totalamount");
+                            Order.SetButtonsSate(entityForm);
+                        },
+                        function (errorMessage)
+                        {
+                            LLP.LOG.Error(LLP.Enums.Module.Order, "Order.OnLoad: MobileCRM.UI.EntityForm.:", errorMessage);
+                        }
+                    );
+                } catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Order, "Order.OnLoad", e);
+                }
+            },
+            OnSave: function (entityForm) {
+                try {
+                    var saveHandler = entityForm.suspendSave();
+                    Order.IsSaving = true;
+                    if (LLP.Form.IsCreate()) {
+                        LLP.Common.SetAttributeValue(entityForm.entity, "name", Order.GetDate(new Date()));
+                    }
+                    if (Order.SetToCompleted) {
+                        Order.SetCompleted(entityForm);
+
+                        LLP.Fetch.GetChildRows("pe_orderproduct", "pe_orderid", entityForm.entity.id, ["pe_orderproductid"], saveHandler, function (result, saveHandler) {
+                            MobileCRM.UI.EntityForm.requestObject(function (ef) {
+                                LLP.Common.SetAttributeValue(ef.entity, "pe_countofrelatedrows", result.length);
+                                saveHandler.resumeSave();
+                            },
+                            function (error) {
+                                LLP.LOG.Error(LLP.Enums.Module.Order, "Order.OnSave -> MobileCRM.UI.EntityForm.requestObject", e);
+                            }, null);
+                        });
+                    }
+                    else {
+                        saveHandler.resumeSave();
+                    }
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Order, "Order.OnSave", e);
+                }
+            },
+            OnPostSave: function (entityForm) {
+                try {
+                    var pe_visitactivityRef = LLP.Common.GetAttributeValue(entityForm.entity, "pe_visitactivityid");
+                    if (Order.SetToCompleted && pe_visitactivityRef) {
+                        var pe_visitactivity = new MobileCRM.DynamicEntity.createNew("pe_visitactivity");
+                        pe_visitactivity.isNew = false;
+                        pe_visitactivity.id = pe_visitactivityRef.id;
+                        LLP.Common.SetAttributeValue(pe_visitactivity, "pe_lastrun", new Date());
+                        LLP.Common.SetAttributeValue(pe_visitactivity, "statuscode", 100000000); // completed
+                        pe_visitactivity.save(
+                             function (err) {
+                                 if (err) {
+                                     LLP.LOG.Error(LLP.Enums.Module.TableSurvey, "Error Save pe_visitactivity -> callback: ", err);
+                                 }
+                             }
+                        );
+                    }
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Order, "Order.OnPostSave", e);
+                }
+            }
+        }
+
+        window.onload = function ()
+        {
+            Order.OnLoad();
+        }
+
+
+    </script>
+</body>
+
+</html>

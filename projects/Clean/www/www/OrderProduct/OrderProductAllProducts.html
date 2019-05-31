@@ -1,0 +1,222 @@
+﻿<!DOCTYPE html>
+
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="utf-8" />
+    <title>Empty Offline HTML page</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="initial-scale=1, user-scalable=no" />
+    <script src="..\Common\JSBridge.js"></script>
+    <script src="..\Common\pe_GlobalCommonFunctions.js"></script>
+</head>
+<body>
+    <script>
+
+        //Task 5201 |
+        //----------
+        //Pouze Resco
+        //--------------
+        //1) entita: pe_orderproduct
+        //napocitavat do pole:
+        //pe_totalprice = pe_numberofunits * pe_currentprice
+        //- napocitavat pri zmene pole: pe_currentprice (=vzdy)
+        //- napocitavat pri zmene pole: pe_numberofunits (=vzdy)
+
+        //2) na entite: salesorder (Order)
+        //do pole totalamount
+        //napocitavat soucet vsech radku z entity pe_OrderProductAllProducts.pe_totalprice 
+        //- zde idealne napocitavat pri kazde zmene pe_OrderProductAllProducts.pe_totalprice (takto se chova krabicova entita)
+        //- propojeni pres: pe_OrderProductAllProducts.pe_orderid
+
+        //ODV 14.3.2019:
+        //blbe zadani, je potreba pocitat 1) jako:
+        //pe_totalprice = pe_numberofunits * pe_priceperunit
+        //*******************************************************************
+        //Task 5221 |
+        //----------
+        //entita: salesorder
+        //pole pouze pro cteni:
+        //TotalAmount
+
+        //entita: pe_orderproduct
+        //pole jen pro cteni:
+        //pe_orderid
+        //pe_orderproductid
+        //pe_productid
+        //pe_campaignid
+        //pe_sectionid
+        //pe_priceperunit
+        //pe_totalprice
+        //pe_ordertaking
+        //pe_pricecheck
+        //pe_storecheck
+        //pe_maxoflevelsofsets
+        //pe_fromsets
+        //****************************************************************
+        //Task 5224
+        //Resco
+        //--------
+        //entita pe_orderproduct
+        //--------
+
+        //1) zmena nazvu souboru:
+        //ProductOrder -> ProductOrderAllProducts
+        //OrderProductRow.html -> OrderProductAllProductsRow.html
+        //pridan novy soubor: 
+        //OrderProductPriceCheck.html
+        //OrderProductPriceCheckRow.html
+
+        var OrderProductAllProducts = OrderProductAllProducts || {
+            Enums: {
+                // Detail view display name
+                DetailViewName: {
+                    General: "General"
+                }
+            },
+            ReadOnlyFields: ["pe_orderid"
+                            ,"pe_orderproductid"
+                            ,"pe_productid"
+                            ,"pe_campaignid"
+                            ,"pe_sectionid"
+                            ,"pe_priceperunit"
+                            ,"pe_totalprice"
+                            ,"pe_ordertaking"
+                            ,"pe_pricecheck"
+                            ,"pe_storecheck"
+                            ,"pe_maxoflevelsofsets"
+                            ,"pe_fromsets"],
+            CalculateTotalPrice: function () {
+                try {
+                    var pe_priceperunit = LLP.Common.Attribute_GetValue(OrderProductAllProducts.Enums.DetailViewName.General, "pe_priceperunit");
+                    var pe_numberofunits = LLP.Common.Attribute_GetValue(OrderProductAllProducts.Enums.DetailViewName.General, "pe_numberofunits");
+                    var totalPrice = 0;
+                    if (pe_priceperunit && pe_numberofunits) {
+                        totalPrice = pe_numberofunits * pe_priceperunit;
+                    }
+                    LLP.Common.Attribute_SetValue(OrderProductAllProducts.Enums.DetailViewName.General, "pe_totalprice", totalPrice);
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.OrderProductAllProducts, "CalculateTotalPrice", e);
+                }
+            },
+            SetReadonlyFields: function () {
+                try {
+                    var failedFields = null;
+                    var delimiter = "";
+
+                    for (var i = 0; i < OrderProductAllProducts.ReadOnlyFields.length; i++) {
+                        try {
+                            LLP.Common.Attribute_Disabled(OrderProductAllProducts.Enums.DetailViewName.General, OrderProductAllProducts.ReadOnlyFields[i]);
+                        }
+                        catch (e) {
+                            failedFields += delimiter + OrderProductAllProducts.ReadOnlyFields[i];
+
+                            if (LLP.Common.IsNullOrEmpty(delimiter)) {
+                                delimiter = ", ";
+                            }
+                        }
+                    }
+
+                    if (!LLP.Common.IsNullOrEmpty(failedFields)) {
+                        LLP.LOG.Error(LLP.Enums.Module.OrderProductAllProducts, "SetReadonlyFields", "Failed to disable this fields: " + failedFields);
+                    }
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.OrderProductAllProducts, "SetReadonlyFields", e);
+                }
+            },
+            OnChange_CurrentPrice: function (entityForm) {
+                try {
+                    LLP.SetExecutionContext(entityForm);
+                    OrderProductAllProducts.CalculateTotalPrice();
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.OrderProductAllProducts, "OnChange_CurrentPrice", e);
+                }
+            },
+            OnChange_NumberOfUnits: function (entityForm) {
+                try {
+                    LLP.SetExecutionContext(entityForm);
+                    OrderProductAllProducts.CalculateTotalPrice();
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.OrderProductAllProducts, "OnChange_NumberOfUnits", e);
+                }
+            },
+            OnLoad: function () {
+                try {
+                    MobileCRM.UI.EntityForm.onItemChange("pe_priceperunit", OrderProductAllProducts.OnChange_CurrentPrice, true, null);
+                    MobileCRM.UI.EntityForm.onItemChange("pe_numberofunits", OrderProductAllProducts.OnChange_NumberOfUnits, true, null);
+                    MobileCRM.UI.EntityForm.onSave(OrderProductAllProducts.OnSave, true, null);
+                    MobileCRM.UI.EntityForm.onPostSave(OrderProductAllProducts.OnPostSave, true, null);
+
+                    MobileCRM.UI.EntityForm.requestObject(function (entityForm) {
+                        LLP.SetExecutionContext(entityForm);
+                        OrderProductAllProducts.SetReadonlyFields();
+                    },
+                    function (error) {
+                        LLP.LOG.Error(LLP.Enums.Module.OrderProductAllProducts, "OnLoad -> MobileCRM.UI.EntityForm.requestObject", error);
+                    }, null);
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.OrderProductAllProducts, "OnLoad", e);
+                }
+            },
+            OnPostSave: function (entityForm) {
+                try {
+                    var postSaveHandler = entityForm.suspendPostSave();
+                    var pe_orderid = LLP.Common.GetAttributeValue(entityForm.entity, "pe_orderid");
+
+                    var xml =
+                            '<fetch>\
+		                        <entity name="pe_orderproduct">\
+                                <attribute name="pe_totalprice" />\
+		                        <filter type="and">\
+			                        <condition attribute="pe_orderid" operator="eq" value="' + pe_orderid.id + '" />\
+		                        </filter>\
+		                        </entity>\
+	                        </fetch>';
+
+                    MobileCRM.FetchXml.Fetch.deserializeFromXml(xml, function (fetch) {
+                        fetch.execute("DynamicEntities", function (orderProducts) {
+                            var totalPrice = 0;
+                            for (var i = 0; i < orderProducts.length; i++) {
+                                var pe_totalprice = LLP.Common.GetAttributeValue(orderProducts[i], "pe_totalprice");
+                                if (pe_totalprice) {
+                                    totalPrice += pe_totalprice;
+                                }
+                            }
+
+                            MobileCRM.DynamicEntity.loadById("salesorder", pe_orderid.id, function (result) {
+                                LLP.Common.SetAttributeValue(result, "totalamount", totalPrice);
+                                result.save(function (err) {
+                                    if (err) {
+                                        LLP.LOG.Error(LLP.Enums.Module.OrderProductAllProducts, "OnPostSave -> saving salesorder '" + pe_orderid.id + "' failed", err);
+                                        postSaveHandler.resumePostSave(err);
+                                    }
+                                    else {
+                                        postSaveHandler.resumePostSave();
+                                        MobileCRM.UI.EntityForm.refreshForm();
+                                    }
+                                });
+                            },
+                            function (error) {
+                                LLP.LOG.Error(LLP.Enums.Module.OrderProductAllProducts, "OnPostSave -> loading salesorder '" + pe_orderid.id + "' failed", error);
+                            }, null);
+
+                        }, MobileCRM.bridge.alert);
+                    }, MobileCRM.bridge.alert);
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.OrderProductAllProducts, "OnPostSave", e);
+                }
+            }
+        }
+
+        window.onload = function () {
+            OrderProductAllProducts.OnLoad();
+        }
+
+    </script>
+</body>
+</html>

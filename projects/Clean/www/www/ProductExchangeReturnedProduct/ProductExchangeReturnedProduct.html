@@ -1,0 +1,92 @@
+﻿<!DOCTYPE html>
+
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="utf-8" />
+    <title>Empty Offline HTML page</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="initial-scale=1, user-scalable=no" />
+    <script src="..\Common\JSBridge.js"></script>
+    <script src="..\Common\pe_GlobalCommonFunctions.js"></script>
+</head>
+<body>
+    <script>
+        //Task 4993
+        //doufám, že to popíšu srozumitelně, funkce pouze v Resco, CRM pak pro čtení:
+
+        //Mám entitu Product Exchange, která má 2 stavy: Draft, Submitted
+        //ve stavu Draft na hlavičce upravuji data (account, contact, date...) a pak mam 2 navazne enitty:
+        //pe_productexchangereturned
+        //pe_productexchangeissuedp
+        //oboje jsou provázané přes lookup: pe_productexchangeid
+
+        //a jakmile obchodník doplní všechny řádky, zákazník se podepíše, obchodník klikne na tlačítko "Submit", celý záznam se zamkne včetně obou subgridů 
+        //a jejich řádek = hlavička půjde do stavu Commited, řádky v subgridech bych nechal ve standardním stavu "inactive" (submitted je jen přejmenovaný inactive stav)
+
+        var ProductExchangeReturnedProduct = ProductExchangeReturnedProduct || {
+            Enums: {
+                // Detail view display name
+                DisplayName: {
+                    General: "General"
+                },
+                StatusCode: {
+                    Active: 1,
+                    Inactive: 2
+                },
+                ProductExchangeStatusCode: {
+                    Submitted: 2
+                }
+            },
+            SetEditability: function (entityForm) {
+                try {
+                    var disabled = false;
+                    if (LLP.Common.GetAttributeValue(entityForm.entity, "statuscode") == ProductExchangeReturnedProduct.Enums.StatusCode.Inactive) {
+                        disabled = true;
+                    }
+
+                    LLP.Common.Attribute_IsDisabled(ProductExchangeReturnedProduct.Enums.DisplayName.General, "pe_brandid", disabled);
+                    LLP.Common.Attribute_IsDisabled(ProductExchangeReturnedProduct.Enums.DisplayName.General, "pe_packagingcapacityid", disabled);
+                    LLP.Common.Attribute_IsDisabled(ProductExchangeReturnedProduct.Enums.DisplayName.General, "pe_numberofpieces", disabled);
+                    LLP.Common.Attribute_IsDisabled(ProductExchangeReturnedProduct.Enums.DisplayName.General, "pe_expirydate", disabled);
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.ProductExchangeReturnedProduct, "SetEditability", e);
+                }
+            },
+            OnLoad: function () {
+                try
+                {
+                    MobileCRM.UI.EntityForm.requestObject(function (entityForm) {
+                        LLP.SetExecutionContext(entityForm);
+
+                        LLP.Fetch.IsAttributeValue(LLP.Common.GetAttributeValue(entityForm.entity, "pe_productexchangeid"), "statuscode", ProductExchangeReturnedProduct.Enums.ProductExchangeStatusCode.Submitted, function (isSet) {
+
+                            MobileCRM.UI.EntityForm.requestObject(function (entityForm) {
+                                LLP.SetExecutionContext(entityForm);
+                                if (isSet) {
+                                    LLP.Form.Disabled(true);
+                                }
+                                else {
+                                    ProductExchangeReturnedProduct.SetEditability(entityForm);
+                                }
+                            },
+                            function (error) {
+                                LLP.LOG.Error(LLP.Enums.Module.ProductExchangeReturnedProduct, "OnLoad -> LLP.Fetch.IsAttributeValue -> callback -> MobileCRM.UI.EntityForm.requestObject", e);
+                            }, null);
+
+                        });
+                    });
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.ProductExchangeReturnedProduct, "OnLoad: ", e);
+                }
+            }
+        }
+
+        window.onload = function () {
+            ProductExchangeReturnedProduct.OnLoad();
+        }
+
+    </script>
+</body>
+</html>

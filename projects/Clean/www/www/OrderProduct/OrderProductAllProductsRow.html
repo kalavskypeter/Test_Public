@@ -1,0 +1,228 @@
+﻿<!DOCTYPE html>
+
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="utf-8" />
+    <title>Empty Offline HTML page</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="initial-scale=1, user-scalable=no" />
+    <script src="..\Common\JSBridge.js"></script>
+    <script src="..\Common\pe_GlobalCommonFunctions.js"></script>
+</head>
+<body>
+    <script>
+
+        //Task 5201
+        //Pouze Resco
+        //--------------
+        //1) entita: pe_orderproduct
+        //napocitavat do pole:
+        //pe_totalprice = pe_numberofunits * pe_currentprice
+        //- napocitavat pri zmene pole: pe_currentprice (=vzdy)
+        //- napocitavat pri zmene pole: pe_numberofunits (=vzdy)
+
+        //2) na entite: salesorder (Order)
+        //do pole totalamount
+        //napocitavat soucet vsech radku z entity pe_orderproduct.pe_totalprice 
+        //- zde idealne napocitavat pri kazde zmene pe_orderproduct.pe_totalprice (takto se chova krabicova entita)
+        //- propojeni pres: pe_orderproduct.pe_orderid
+
+        //ODV 14.3.2019:
+        //blbe zadani, je potreba pocitat 1) jako:
+        //pe_totalprice = pe_numberofunits * pe_priceperunit
+        //****************************************************************
+        //Task 5224
+        //Resco
+        //--------
+        //entita pe_orderproduct
+        //--------
+
+        //1) zmena nazvu souboru:
+        //ProductOrder -> ProductOrderAllProducts
+        //OrderProductAllProductsRow.html -> OrderProductAllProductsRow.html
+        //pridan novy soubor: 
+        //OrderProductPriceCheck.html
+        //OrderProductPriceCheckRow.html
+        //****************************************************************
+        //Task 5238
+        //pri kliknuti na tlacitko Recalculate Order, udelat tyto cinnost v poradi:
+        //    - ulozit vsechny radky, kde 
+        //    - prepocitat Total Ammout
+        //    - refreshnout Order (aby se zobrazila cena)
+
+        var OrderProductAllProductsRow = OrderProductAllProductsRow || {
+            Enums: {
+                OrderStatusCode: {
+                    Completed: 690970001
+                }
+            },
+            DoSave: function (entities, saveHandler) {
+                try {
+
+                    var editedEntities = {};
+                    var pe_orderid = LLP.Common.GetAttributeValue(entities[0], "pe_orderid");
+
+                    for (var i = 0; i < entities.length; i++) {
+                        editedEntities[entities[i].id] = entities[i];
+                    }
+                    
+                    if (!saveHandler) {
+                        var results = [];
+
+                        for (var i = 0; i < entities.length; i++) {
+                            entities[i].save(function (err) {
+                                if (err) {
+                                    results.push(false);
+                                }
+                                else {
+                                    results.push(true);
+                                }
+
+                                if (results.length == entities.length && results.indexOf(false) < 0) {
+                                    OrderProductAllProductsRow.CalculateTotalAmount(editedEntities, pe_orderid, saveHandler);
+                                }
+                            });
+                        }
+                    }
+                    else {
+                        OrderProductAllProductsRow.CalculateTotalAmount(editedEntities, pe_orderid, saveHandler);
+                    }
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.OrderProductAllProductsRow, "DoSave", e);
+                }
+            },
+            CalculateTotalAmount: function (editedEntities, pe_orderid, saveHandler) {
+                try {
+
+                    var xml =
+                            '<fetch>\
+		                        <entity name="pe_orderproduct">\
+                                <attribute name="pe_orderproductid" />\
+                                <attribute name="pe_totalprice" />\
+		                        <filter type="and">\
+			                        <condition attribute="pe_orderid" operator="eq" value="' + pe_orderid.id + '" />\
+		                        </filter>\
+		                        </entity>\
+	                        </fetch>';
+
+                    MobileCRM.FetchXml.Fetch.deserializeFromXml(xml, function (fetch) {
+                        fetch.execute("DynamicEntities", function (orderProducts) {
+                            var totalPrice = 0;
+                            for (var i = 0; i < orderProducts.length; i++) {
+
+                                var pe_totalprice = 0;
+                                var editedEntity = editedEntities[orderProducts[i].id];
+
+                                if (editedEntity) {
+                                    pe_totalprice = LLP.Common.GetAttributeValue(editedEntity, "pe_totalprice");
+                                }
+                                else {
+                                    pe_totalprice = LLP.Common.GetAttributeValue(orderProducts[i], "pe_totalprice");
+                                }
+
+                                if (pe_totalprice) {
+                                    totalPrice += pe_totalprice;
+                                }
+                            }
+
+                            MobileCRM.DynamicEntity.loadById("salesorder", pe_orderid.id, function (result) {
+                                LLP.Common.SetAttributeValue(result, "totalamount", totalPrice);
+                                result.save(function (err) {
+                                    if (err) {
+                                        LLP.LOG.Error(LLP.Enums.Module.OrderProduct, "OnPostSave -> saving salesorder '" + pe_orderid.id + "' failed: ", err);
+                                        if (saveHandler) {
+                                            saveHandler.resumeSave(err);
+                                        }
+                                    }
+                                    else {
+                                        if (saveHandler) {
+                                            saveHandler.resumeSave();
+                                        }
+                                        MobileCRM.bridge.raiseGlobalEvent(LLP.GlobalEvents.OrderProductAllProductsRowSave, null);
+                                    }
+                                });
+                            },
+                            function (error) {
+                                LLP.LOG.Error(LLP.Enums.Module.OrderProduct, "OnPostSave -> loading salesorder '" + pe_orderid.id + "' failed: ", error);
+                            }, null);
+
+                        }, MobileCRM.bridge.alert);
+                    }, MobileCRM.bridge.alert);
+                }
+                catch (e) {
+
+                }
+            },
+            CheckOrderStatusCode: function(statusCode) {
+                try {
+                    if (statusCode == OrderProductAllProductsRow.Enums.OrderStatusCode.Completed) {
+                        MobileCRM.UI.EntityList.selectView("Order Products – All Products – ReadOnly");
+                    }
+                    else {
+                        MobileCRM.UI.EntityList.selectView("Order Products – All Products");
+                    }
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.OrderProductAllProductsRow, "CheckOrderStatusCode", e);
+                }
+            },
+            OnChange_NumberofUnits: function (entityList) {
+                try {
+                    var context = entityList.context;
+                    if (context.propertyName == "pe_numberofunits") {
+                        var editedEntities = entityList.context.entities;
+                        var props = editedEntities[0].properties;
+                        props.pe_totalprice = props.pe_priceperunit * props.pe_numberofunits;
+                    }
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.OrderProductAllProductsRow, "OnLoad", e);
+                }
+            },
+            OnLoad: function () {
+                try
+                {
+                    MobileCRM.UI.EntityList.onChange(OrderProductAllProductsRow.OnChange_NumberofUnits, true, null);
+                    MobileCRM.UI.EntityList.onSave(OrderProductAllProductsRow.OnSave, true, null);
+                    MobileCRM.bridge.onGlobalEvent(LLP.GlobalEvents.OrderProductAllProductsRecalculate, OrderProductAllProductsRow.GlobalEvent_Recalculate, true);
+                    MobileCRM.UI.EntityList.requestObject(function (entityList) {
+                        var statucode = LLP.Common.GetAttributeValue(entityList.relationship.target, "statuscode");
+                        OrderProductAllProductsRow.CheckOrderStatusCode(statucode);
+                    },
+                    function (error) {
+                        LLP.LOG.Error(LLP.Enums.Module.OrderProductAllProductsRow, "OnLoad -> MobileCRM.UI.EntityList.requestObject", error);
+                    }, null);
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.OrderProductAllProductsRow, "OnLoad", e);
+                }
+            },
+            OnSave: function (entityList) {
+                try {
+                    var saveHandler = entityList.suspendSave();
+                    OrderProductAllProductsRow.DoSave(entityList.context.entities, saveHandler);
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.OrderProductAllProductsRow, "OnSave: ", e);
+                }
+            },
+            GlobalEvent_Recalculate: function (args) {
+                MobileCRM.UI.EntityList.requestObject(function (entityList) {
+                    MobileCRM.UI.EntityList.requestEditedEntities(function (editedEntities) {
+                        OrderProductAllProductsRow.DoSave(editedEntities);
+                    }, MobileCRM.bridge.alert, null);
+                },
+                function (error) {
+                    LLP.LOG.Error(LLP.Enums.Module.OrderProductAllProductsRow, "GlobalEvent_Recalculate -> MobileCRM.UI.EntityList.requestObject", error);
+                }, null);
+            }
+        }
+
+        window.onload = function () {
+            OrderProductAllProductsRow.OnLoad();
+        }
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,141 @@
+﻿<!DOCTYPE html>
+
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="utf-8" />
+    <title>Empty Offline HTML page</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="initial-scale=1, user-scalable=no" />
+    <script src="..\Common\JSBridge.js"></script>
+    <script src="..\Common\pe_GlobalCommonFunctions.js"></script>
+    <script src="..\Common\jquery-3.3.1.min.js"></script>
+    <script src="..\Common\popper.min.js"></script>
+    <script src="..\Common\bootstrap.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="..\Common\bootstrap.min.css">
+</head>
+<body>
+
+    <div class="container mt-1">
+        <div class="row">
+            <button id="btnSave" class="btn btn-primary btn-block" onclick="Case.OnClick_Save();">Save</button>
+        </div>
+        <div class="row mt-2">
+            <button id="btnSaveAndSendToCCM" class="btn btn-primary btn-block" onclick="Case.OnClick_SaveAndSendToCCM();">Save and Send to CCM</button>
+        </div>
+    </div>
+    
+
+    <script>
+
+    //Task 4705 |
+    //----------
+    //Na formuláři Casu vytvoř nové tlačítka
+    //Save - uloží záznam
+    //Save and Send to CCM - uloží záznam a změní stav záznamu (status reason) na In Progress (1)
+
+    //Když je Case ve stavu in Progress, tak zamkne všechny pole na formuláři - read only. Definice stavů ve kterých budou pole uzamčené se zvětší
+
+    var Case = Case || {
+        Enums: {
+            // Detail view display name
+            DisplayViewName: {
+                General: "General"
+            },
+            StatusCode: {
+                InProgress: 1,
+                InformationProvided: 1000,
+                OnHold: 2,
+                Merged: 2000,
+                WaitingForDetails: 3,
+                Researching: 4,
+                ProblemSolved: 5,
+                Cancelled: 6
+            }
+        },
+        EditableFields: ["pe_accountid", "pe_accountidname", "pe_accountidyominame", "pe_additionalinfo", "pe_batchnumber", "pe_beerdelivered",
+                         "pe_beerweight", "pe_ccmstatuschanged", "pe_ccmstatusid", "pe_ccmstatusidname", "pe_claimcause", "pe_claimconfirmation",
+                         "pe_claimconfirmationname", "pe_claimquantity", "pe_expirationdate", "pe_kegcapacity", "pe_kegnumber", "pe_kegnumberfrombottom",
+                         "pe_packagetype", "pe_packagetypename", "pe_productid", "pe_productidname", "pe_recordnumber", "pe_sealnumber", "title",
+                         "customerid", "emailaddress", "subjected", "prioritycode", "casetypecode", "customersatisfactioncode"],
+        SendToCCM: false,
+        SetEditability: function(entityForm) {
+            try {
+                var disabled = false;
+                if (LLP.Common.GetAttributeValue(entityForm.entity, "statuscode") == Case.Enums.StatusCode.InProgress) {
+                    LLP.Form.Disabled();
+                    LLP.HtmlControl.SetDisabled("btnSave", true);
+                    LLP.HtmlControl.SetDisabled("btnSaveAndSendToCCM", true);
+                }
+                else {
+                    for (let i = 0; i < Case.EditableFields.length; i++) {
+                        LLP.Common.Attribute_Enabled(Case.Enums.DisplayViewName.General, Case.EditableFields[i]);
+                    }
+                }
+            }
+            catch (e) {
+                LLP.LOG.Error(LLP.Enums.Module.Case, "SetEditability", e);
+            }
+        },
+        SetInProgress: function (entity) {
+            LLP.Common.SetAttributeValue(entity, "statuscode", Case.Enums.StatusCode.InProgress);
+        },
+        OnClick_Save: function () {
+            try {
+                MobileCRM.UI.EntityForm.save();
+            }
+            catch (e) {
+                LLP.LOG.Error(LLP.Enums.Module.Case, "Save", e);
+            }
+        },
+        OnClick_SaveAndSendToCCM: function () {
+            try {
+                MobileCRM.UI.EntityForm.requestObject(function (entityForm) {
+                    if (!entityForm.isDirty) {
+                        Case.SetInProgress(entityForm.entity);
+                    }
+                    else {
+                        Case.SendToCCM = true;
+                    }
+
+                    MobileCRM.UI.EntityForm.save();
+                },
+                function (error) {
+                    LLP.LOG.Error(LLP.Enums.Module.Case, "SaveAndSendToCCM -> MobileCRM.UI.EntityForm.requestObject", error);
+                }, null);
+            }
+            catch (e) {
+                LLP.LOG.Error(LLP.Enums.Module.Case, "Save", e);
+            }
+        },
+        OnLoad: function () {
+            try
+            {
+                MobileCRM.UI.EntityForm.onSave(Case.OnSave, true, null);
+                MobileCRM.UI.EntityForm.requestObject(function (entityForm) {
+                    LLP.SetExecutionContext(entityForm);
+                    Case.SetEditability(entityForm);
+                });
+            }
+            catch (e) {
+                LLP.LOG.Error(LLP.Enums.Module.Case, "OnLoad: ", e);
+            }
+        },
+        OnSave: function (entityForm) {
+            try {
+                if (Case.SendToCCM) {
+                    Case.SetInProgress(entityForm.entity);
+                }
+            }
+            catch (e) {
+                LLP.LOG.Error(LLP.Enums.Module.Case, "OnSave", e);
+            }
+        }
+    }
+
+    window.onload = function () {
+        Case.OnLoad();
+    }
+
+    </script>
+</body>
+</html>

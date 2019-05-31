@@ -1,0 +1,127 @@
+﻿<!DOCTYPE html>
+
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="utf-8" />
+    <title>Empty Offline HTML page</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="initial-scale=1, user-scalable=no" />
+    <script src="..\Common\JSBridge.js"></script>
+    <script src="..\Common\pe_GlobalCommonFunctions.js"></script>
+</head>
+<body>
+
+    <div class="container">
+        <div class="row"><p> </p></div>
+        <div class="row">
+            <div class="col">
+                <button class="btn btn-primary btn-block" id="btnCompleted" onclick="Task.OnClick_Completed();">Completed</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+
+
+        var Task = Task || {
+            Enums: {
+                // Detail view display name
+                DisplayName: {
+                    General: "General"
+                }
+            },
+            SetToCompleted: false,
+            OnClick_Completed: function()
+            {
+                try {
+                    Task.SetToCompleted = true;
+                    MobileCRM.UI.EntityForm.requestObject(function (entityForm)
+                    {
+                        if (!entityForm.isDirty) {
+                            Task.SetCompleted(entityForm);
+                        }
+
+                        MobileCRM.UI.EntityForm.save();
+
+                    },
+                    function (error)
+                    {
+                        LLP.LOG.Error(LLP.Enums.Module.Task, "Task.OnClick_Completed -> MobileCRM.UI.EntityForm.requestObject", error);
+                    }, null);
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Task, "Task.OnClick_Completed", e);
+                }
+            },
+            SetCompleted: function (entityForm)
+            {
+                try {
+                    LLP.Common.SetAttributeValue(entityForm.entity, "statuscode", Order.Enums.StatusCode.Completed);
+                } catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Task, "Task.OnClick_Completed", e);
+                }
+            },
+
+            OnLoad: function () {
+                try
+                {
+                    MobileCRM.UI.EntityForm.onPostSave(Task.OnPostSave, true, null);
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Task, "OnLoad", e);
+                }
+            },
+            OnPostSave: function (entityForm)
+            {
+                try {
+                    Task.UpdateVisitActivity(Task.SetToCompleted, entityForm.entity)
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.MAServiceOn, "OnPostSave", e);
+                }
+            },
+
+            UpdateVisitActivity: function (setToCompleted, entity)
+            {
+                try {
+
+
+                    if (setToCompleted) {
+
+                        var pe_VisitActivityRef = LLP.Common.GetAttributeValue(entity, "pe_visitactivityid");
+
+                        if (LLP.Common.IsNullOrEmpty(pe_VisitActivityRef)) {
+                            // neni odkaz  neni co updatovat
+                            return;
+                        }
+
+                        var pe_visitactivityEdit = new MobileCRM.DynamicEntity.createNew("pe_visitactivity");
+                        pe_visitactivityEdit.isNew = false;
+                        pe_visitactivityEdit.id = pe_VisitActivityRef.id;
+                        LLP.Common.SetAttributeValue(pe_visitactivityEdit, "pe_lastrun", new Date());
+                        LLP.Common.SetAttributeValue(pe_visitactivityEdit, "statuscode", 100000000); // completed
+
+                        pe_visitactivityEdit.save(
+                             function (err)
+                             {
+                                 if (err) {
+                                     LLP.LOG.Error(LLP.Enums.Module.MAServiceOn, "Error Save pe_visitactivityEdit -> callback: ", err);
+                                 }
+                             }
+                        );
+                    }
+
+                } catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.MAServiceOn, "OnPostSave", e);
+                }
+
+            }
+        }
+
+        window.onload = function () {
+            Task.OnLoad();
+        }
+
+    </script>
+</body>
+</html>

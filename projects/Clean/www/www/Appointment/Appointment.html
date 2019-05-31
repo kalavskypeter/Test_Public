@@ -1,0 +1,631 @@
+﻿<!DOCTYPE html>
+
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="utf-8" />
+    <title>Empty Offline HTML page</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="initial-scale=1, user-scalable=no" />
+    <script src="..\Common\JSBridge.js"></script>
+    <script src="..\Common\pe_GlobalCommonFunctions.js"></script>
+    <script src="..\Common\jquery-3.3.1.min.js"></script>
+    <script src="..\Common\popper.min.js"></script>
+    <script src="..\Common\bootstrap.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="..\Common\bootstrap.min.css">
+</head>
+<body>
+    <label id="logLabel"></label>
+    <div id="actionButtons" class="container">
+        <div class="row">
+            <div class="col"><button id="btnStart" class="btn btn-primary btn-block" onclick="Appointment.OnClick_Button(this);">Start</button></div>
+            <div class="col"><button id="btnFinish" class="btn btn-primary btn-block" onclick="Appointment.OnClick_Button(this);">Finish</button></div>
+        </div>
+        <div class="row"><p></p></div>
+        <div class="row">
+            <div class="col"><button id="btnOnHold" class="btn btn-primary btn-block" onclick="Appointment.OnClick_Button(this);">On hold</button></div>
+            <div class="col"><button id="btnResume" class="btn btn-primary btn-block" onclick="Appointment.OnClick_Button(this);">Resume</button></div>
+        </div>
+        <div class="row"><p></p></div>
+        <div class="row">
+            <div class="col">
+                <button id="btnDoNotCloseTrue" class="btn btn-primary btn-block" onclick="Appointment.OnClick_Button(this);">Do not close</button>
+                <button id="btnDoNotCloseFalse" class="btn btn-primary btn-block" onclick="Appointment.OnClick_Button(this);">Can be closed</button>
+            </div>
+            <div class="col"><button id="btnCancel" class="btn btn-primary btn-block" onclick="Appointment.OnClick_Button(this);">Cancel</button></div>
+        </div>
+        <div class="row"><p></p></div>
+        <div class="row">
+            <div class="col"><button id="btnSendToTLS" class="btn btn-primary btn-block" onclick="Appointment.OnClick_SendToTLS();">Send to TLS</button></div>
+        </div>
+    </div>
+    <div id="cancelReason" class="container cancelReason">
+        <div class="row"><div class="col-12 col-form-label"><h2>Cancel reason</h2></div></div>
+        <div class="row"><div class="col-12"><textarea id="cancelReasonText" rows="5" class="cancelReasonText form-control"></textarea></div></div>
+        <div class="row"><p></p></div>
+        <div class="row">
+            <div class="col-6"><button id="btnConfirmCancel" class="btn btn-primary btn-block" onclick="Appointment.OnClick_Button(this);">Confirm</button></div>
+            <div class="col-6"><button id="btnCancelBack" class="btn btn-primary btn-block" onclick="Appointment.OnClick_Button(this);">Back</button></div>
+        </div>
+    </div>
+    <script>
+
+        //Task 4967: Visit Duration Actions
+        //V rámci Visit musíme zaznamenat délku celé schůzky. Viz. nákres v Use Story
+        //1)Pro zaznamenání musí uživatel v Rescu otevřít Visit a kliknout na nové tlačítko Start pro ukončení použije tlačítko Finish.  Start/Finish zaznamená dobu trvání od, do a čas trvání
+        //2) Po stisktnutí Start zkontrolovat, že neexistuje jiná schůzka ve stavu Busy (na schůzce stisknul uživatel Start). V případě, že již je, tak zobraz chybovou hlášku
+        //3) Nové tlačítko On Hold - tlačítko nastaví atribut - změní stav na On Hold, změna stavu zruší Start a zastaví počítání  času trvání
+        //4)Start/Finish zaznamená aktuální GPS
+
+        //PZA 13.2.2019: nástřel viz. příloha v User story
+
+        //pe_onholdtime
+        //pe_durationonhold
+        //pe_latitudestart
+        //pe_latitudefinish
+        //pe_longitudestart
+        //pe_longitudefinish
+
+        //SUR 5.3.2019:
+        //Přidat podmínku - Start visit kontroluje, že neexistuje Busy Visit pro aktuálně přihlášeného uživatele tzn. ownerid appointmentu.
+        //******************************************************************************************************************
+        //Task 5381 |
+        //----------
+        //Vytvoř nové tlačítko Send to TLS , které bude aktivní pouze v případě, že Visit není spuštěná, zastavená, nebo zrušená... tzn. je ve stavu pouze Planned. V případě označení Visit statusem Send to TLS (100,000,001) , tak systém změní stav visit a automaticky vygeneruje telefonní hovor . Visit se následně uzamkne pouze pro čtení.
+
+        //nový záznam do entity: phonecall
+        //doplní následující atributy na entitě:
+        //subject = appointment.name (Název Visity)
+        //from = appointment.ownerid (Vlasník Visity)
+        //to = appointment.regardingobjectid (Regarding Account Visity)
+        //phonenumber = regarding Account account.telephone1
+        //directioncode = Outgoing
+        //regardingobjectid = appointment regardingid ( Regarding z Visit)
+        //scheduledend = today + 1
+        //statuscode = 100,000,000
+        //ownerid = tady bych potřeboval nastavit nějakou proměnou. Bude to nejpíš vždy tým, ale kdyby to šlo nastavovat v global configu, tak by to bylo super.
+
+
+        var Appointment = Appointment || {
+            Enums: {
+                // Detail view display name
+                DisplayName: {
+                    General: "General"
+                },
+                StatusCode: {
+                    Free: 1,
+                    Planned: 100000000,
+                    OnHold: 100000001,
+                    Tentative: 2,
+                    Completed: 3,
+                    Canceled: 4,
+                    Busy: 5,
+                    OutOfOffice: 6
+                },
+                StateCode: {
+                    Open: 0,
+                    Completed: 1,
+                    Canceled: 2,
+                    Scheduled: 3
+                },
+                ActivityStatusCode: {
+                    Active: 1,
+                    Inactive: 2
+                },
+                PhoneCallStatusCode: {
+                    Open: 1,
+                    SendtoTLS: 100000000,
+                    Made: 2,
+                    Canceled: 3,
+                    Received: 4
+                }
+            },
+            PreviousStatusCode: 1,
+            ButtonsStates: {
+                btnStart: { disabled: false, visible: true, statusCode: 5 },
+                btnOnHold: { disabled: false, visible: true, statusCode: 100000001 },
+                btnResume: { disabled: false, visible: true, statusCode: 5 },
+                btnFinish: { disabled: false, visible: true, statusCode: 3 },
+                btnDoNotCloseTrue: { disabled: false, visible: true },
+                btnDoNotCloseFalse: { disabled: false, visible: false },
+                btnConfirmCancel: { disabled: false, visible: true, statusCode: 4 },
+                btnCancel: { disabled: false, visible: true },
+                btnSendToTLS: { disabled: false, visible: true },
+            },
+            SetStatesObj: function (obj, disabled, visible) {
+                obj.disabled = disabled;
+                obj.visible = visible;
+            },
+            IsOtherVisitInBusyState: function (callback) {
+                MobileCRM.UI.EntityForm.requestObject(function (entityForm) {
+                    //
+                    //
+                    var xml =
+                            '<fetch>\
+		                    <entity name="appointment">\
+                                <attribute name="statuscode" />\
+		                        <filter>\
+                                    <condition attribute="statuscode" operator="eq" value="' + Appointment.Enums.StatusCode.Busy + '" />\
+                                    <condition attribute="ownerid" operator="eq" value="' + LLP.Common.GetAttributeValue(entityForm.entity, "ownerid").id + '" />\
+		                        </filter>\
+		                    </entity>\
+	                    </fetch>';
+
+                    MobileCRM.FetchXml.Fetch.deserializeFromXml(xml, function (fetch) {
+                        fetch.execute("DynamicEntities", function (result) {
+                            if (result.length > 0) {
+                                MobileCRM.bridge.alert("Another visit is in Busy state. Finish running visits first.");
+                                return;
+                            }
+                            else {
+                                callback(entityForm);
+                            }
+                        }, MobileCRM.bridge.alert);
+                    }, MobileCRM.bridge.alert);
+                },
+                function (error) {
+                    LLP.LOG.Error(LLP.Enums.Module.Appointment, "IsOtherVisitInBusyState -> requestObject", error);
+                }, null);
+            },
+            CheckStatusCode: function () {
+                try {
+                    var statuscode = LLP.Common.Attribute_GetValue(Appointment.Enums.DisplayName.General, "statuscode");
+                    var pe_donotclosevisit = LLP.Common.Attribute_GetValue(Appointment.Enums.DisplayName.General, "pe_donotclosevisit");
+
+                    switch (statuscode) {
+                        case Appointment.Enums.StatusCode.Free:
+                        case Appointment.Enums.StatusCode.Planned:
+                            Appointment.SetStatesObj(Appointment.ButtonsStates.btnStart, false, true);
+                            Appointment.SetStatesObj(Appointment.ButtonsStates.btnOnHold, true, true);
+                            Appointment.SetStatesObj(Appointment.ButtonsStates.btnResume, true, true);
+                            Appointment.SetStatesObj(Appointment.ButtonsStates.btnFinish, true, true);
+                            Appointment.SetStatesObj(Appointment.ButtonsStates.btnDoNotCloseTrue, false, !pe_donotclosevisit);
+                            Appointment.SetStatesObj(Appointment.ButtonsStates.btnDoNotCloseFalse, false, pe_donotclosevisit);
+                            Appointment.SetStatesObj(Appointment.ButtonsStates.btnCancel, false, true);
+                            Appointment.SetStatesObj(Appointment.ButtonsStates.btnSendToTLS, false, true);
+                            break;
+                        case Appointment.Enums.StatusCode.OnHold:
+                            Appointment.SetStatesObj(Appointment.ButtonsStates.btnStart, true, true);
+                            Appointment.SetStatesObj(Appointment.ButtonsStates.btnOnHold, true, true);
+                            Appointment.SetStatesObj(Appointment.ButtonsStates.btnResume, false, true);
+                            Appointment.SetStatesObj(Appointment.ButtonsStates.btnFinish, false, true);
+                            Appointment.SetStatesObj(Appointment.ButtonsStates.btnDoNotCloseTrue, true, !pe_donotclosevisit);
+                            Appointment.SetStatesObj(Appointment.ButtonsStates.btnDoNotCloseFalse, true, pe_donotclosevisit);
+                            Appointment.SetStatesObj(Appointment.ButtonsStates.btnCancel, false, true);
+                            Appointment.SetStatesObj(Appointment.ButtonsStates.btnSendToTLS, true, true);
+                            break;
+                        case Appointment.Enums.StatusCode.Busy:
+                            Appointment.SetStatesObj(Appointment.ButtonsStates.btnStart, true, true);
+                            Appointment.SetStatesObj(Appointment.ButtonsStates.btnOnHold, false, true);
+                            Appointment.SetStatesObj(Appointment.ButtonsStates.btnResume, true, true);
+                            Appointment.SetStatesObj(Appointment.ButtonsStates.btnFinish, false, true);
+                            Appointment.SetStatesObj(Appointment.ButtonsStates.btnDoNotCloseTrue, false, !pe_donotclosevisit);
+                            Appointment.SetStatesObj(Appointment.ButtonsStates.btnDoNotCloseFalse, false, pe_donotclosevisit);
+                            Appointment.SetStatesObj(Appointment.ButtonsStates.btnCancel, false, true);
+                            Appointment.SetStatesObj(Appointment.ButtonsStates.btnSendToTLS, true, true);
+                            break;
+                        case Appointment.Enums.StatusCode.Completed:
+                            Appointment.SetStatesObj(Appointment.ButtonsStates.btnStart, true, false);
+                            Appointment.SetStatesObj(Appointment.ButtonsStates.btnOnHold, true, false);
+                            Appointment.SetStatesObj(Appointment.ButtonsStates.btnResume, true, false);
+                            Appointment.SetStatesObj(Appointment.ButtonsStates.btnFinish, true, false);
+                            Appointment.SetStatesObj(Appointment.ButtonsStates.btnDoNotCloseTrue, true, false);
+                            Appointment.SetStatesObj(Appointment.ButtonsStates.btnDoNotCloseFalse, true, false);
+                            Appointment.SetStatesObj(Appointment.ButtonsStates.btnCancel, true, false);
+                            Appointment.SetStatesObj(Appointment.ButtonsStates.btnSendToTLS, false, true);
+                            break;
+                        case Appointment.Enums.StatusCode.Canceled:
+                            Appointment.SetStatesObj(Appointment.ButtonsStates.btnSendToTLS, true, true);
+                            break;
+                    }
+
+                    Appointment.DisableFormFields(statuscode);
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Appointment, "CheckStatusCode:", e);
+                }
+            },
+            DisableFormFields: function (statuscode) {
+                try {
+
+                    switch (statuscode) {
+                        case Appointment.Enums.StatusCode.Free:
+                        case Appointment.Enums.StatusCode.Planned:
+                            LLP.Form.Enabled();
+                            Appointment.ChangeAssociatedViewsCreateNew(true);
+                            break;
+                        case Appointment.Enums.StatusCode.OnHold:
+                            LLP.Form.Disabled();
+                            Appointment.ChangeAssociatedViewsCreateNew(false);
+                            break;
+                        case Appointment.Enums.StatusCode.Busy:
+                            LLP.Form.Enabled();
+                            Appointment.ChangeAssociatedViewsCreateNew(true);
+                            break;
+                        case Appointment.Enums.StatusCode.Completed:
+                            LLP.Form.Disabled();
+                            Appointment.ChangeAssociatedViewsCreateNew(false);
+                            break;
+                    }
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Appointment, "DisableFormFields:", e);
+                }
+            },
+            ChangeAssociatedViewsCreateNew: function (allowCreateNew) {
+                try {
+                    for (var i = 0; i < LLP.entityForm.associatedViews.length; i++) {
+                        LLP.entityForm.associatedViews[i].allowCreateNew = allowCreateNew;
+                    }
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Appointment, "ChangeAssociatedViewsCreateNew:", e);
+                }
+            },
+            SetButtonsStates: function () {
+                try {
+                    var names = Object.getOwnPropertyNames(Appointment.ButtonsStates);
+                    for (var i = 0; i < names.length; i++) {
+                        var btnName = names[i];
+                        var btn = document.getElementById(btnName);
+
+                        btn.hidden = !Appointment.ButtonsStates[btnName].visible;
+                        btn.disabled = Appointment.ButtonsStates[btnName].disabled;
+                        //btn.className = Appointment.ButtonsStates[btnName].disabled ? "" : "blue";
+                    }
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Appointment, "SetButtonsStates:", e);
+                }
+            },
+            SetStatusCode: function (statusCode) {
+                try {
+                    LLP.Common.Attribute_SetValue(Appointment.Enums.DisplayName.General, "statuscode", statusCode);
+                    Appointment.CheckStatusCode();
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Appointment, "SetStatusCode:", e);
+                }
+            },
+            KeepPreviousStatusCode: function () {
+                Appointment.PreviousStatusCode = LLP.Common.Attribute_GetValue(Appointment.Enums.DisplayName.General, "statuscode");
+            },
+            CalculateDuration: function (entity) {
+                try {
+                    var actualDate = new Date();
+                    var actualstart = LLP.Common.GetAttributeValue(entity, "actualstart");
+                    var pe_durationonhold = LLP.Common.GetAttributeValue(entity, "pe_durationonhold");
+
+                    if (!pe_durationonhold) {
+                        pe_durationonhold = 0;
+                    }
+
+                    var duration = ((actualDate - actualstart) / 60000) - pe_durationonhold;
+                    LLP.Common.SetAttributeValue(entity, "actualend", actualDate);
+                    LLP.Common.SetAttributeValue(entity, "actualdurationminutes", Math.round(duration));
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Appointment, "CalculateDuration:", e);
+                }
+            },
+            CalculateOnHoldDuration: function (entity) {
+                try {
+                    var pe_onholdtime = LLP.Common.GetAttributeValue(entity, "pe_onholdtime");
+                    if (pe_onholdtime) {
+                        var actualDate = new Date();
+                        // in minutes
+                        var difference = (actualDate - pe_onholdtime) / 60000;
+                        var pe_durationonhold = LLP.Common.GetAttributeValue(entity, "pe_durationonhold");
+                        if (!pe_durationonhold) {
+                            pe_durationonhold = 0;
+                        }
+
+                        LLP.Common.SetAttributeValue(entity, "pe_durationonhold", Math.round(pe_durationonhold + difference));
+                        LLP.Common.SetAttributeValue(entity, "pe_onholdtime", null);
+                    }
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Appointment, "CalculateOnHoldDuration:", e);
+                }
+            },
+            OnClick_Button: function (btn) {
+                try {
+                    MobileCRM.UI.EntityForm.requestObject(function (entityForm) {
+                        LLP.SetExecutionContext(entityForm);
+                        Appointment.KeepPreviousStatusCode();
+
+                        switch (btn.id) {
+                            case "btnStart":
+                                Appointment.IsOtherVisitInBusyState(function () {
+                                    MobileCRM.UI.EntityForm.requestObject(function (entityForm) {
+                                        LLP.SetExecutionContext(entityForm);
+                                        Appointment.ChangeStatusCode(btn.id);
+                                        LLP.Common.SetAttributeValue(entityForm.entity, "actualstart", new Date());
+                                        Appointment.DoSave(function () {
+                                            MobileCRM.Platform.getLocation(function (result) {
+                                                LLP.Common.SetAttributeValue(entityForm.entity, "pe_latitudestart", result.latitude);
+                                                LLP.Common.SetAttributeValue(entityForm.entity, "pe_longitudestart", result.longitude);
+                                                Appointment.DoSave();
+                                            },
+                                            function (error) {
+                                                LLP.LOG.Error(LLP.Enums.Module.Appointment, "OnClick_Button -> btnStart: Getting location failed", error);
+                                            }, null, 300000, 5, 10000);
+                                        });
+                                    },
+                                    function (error) {
+                                        LLP.LOG.Error(LLP.Enums.Module.Appointment, "OnClick_Button -> btnStart -> callback:", error);
+                                    }, null);
+                                });
+                                break;
+                            case "btnOnHold":
+                                Appointment.ChangeStatusCode(btn.id);
+                                LLP.Common.SetAttributeValue(entityForm.entity, "pe_onholdtime", new Date());
+                                Appointment.DoSave();
+                                break;
+                            case "btnFinish":
+                                Appointment.CheckCanFinish(entityForm, function () {
+                                    MobileCRM.UI.EntityForm.requestObject(function (entityForm) {
+                                        Appointment.ChangeStatusCode(btn.id);
+                                        LLP.Common.SetAttributeValue(entityForm.entity, "actualend", new Date());
+                                        var statuscode = LLP.Common.Attribute_GetValue(Appointment.Enums.DisplayName.General, "statuscode");
+                                        if (statuscode == Appointment.Enums.StatusCode.OnHold) {
+                                            Appointment.CalculateOnHoldDuration(entityForm.entity);
+                                        }
+                                        Appointment.CalculateDuration(entityForm.entity);
+                                        LLP.Common.SetAttributeValue(entityForm.entity, "statuscode", Appointment.Enums.StatusCode.Completed);
+                                        LLP.Common.SetAttributeValue(entityForm.entity, "satecode", Appointment.Enums.StateCode.Completed);
+                                        Appointment.DoSave();
+                                    },
+                                    function (error) {
+                                        LLP.LOG.Error(LLP.Enums.Module.Appointment, "OnClick_Button -> btnFinish -> callback", error);
+                                    }, null);
+                                });
+                                break;
+                            case "btnResume":
+                                Appointment.ChangeStatusCode(btn.id);
+                                Appointment.CalculateOnHoldDuration(entityForm.entity);
+                                Appointment.DoSave();
+                                break;
+                            case "btnCancel":
+                                Appointment.ChangeStatusCode(btn.id);
+                                document.getElementById("actionButtons").hidden = true;
+                                document.getElementById("cancelReason").hidden = false;
+                                break;
+                            case "btnCancelBack":
+                                Appointment.ChangeStatusCode(btn.id);
+                                document.getElementById("actionButtons").hidden = false;
+                                document.getElementById("cancelReason").hidden = true;
+                                break;
+                            case "btnConfirmCancel":
+                                Appointment.ChangeStatusCode(btn.id);
+                                var cancelReason = document.getElementById("cancelReasonText");
+                                if (LLP.Common.IsNullOrEmpty(cancelReason.value.trim())) {
+                                    MobileCRM.bridge.alert("Cancel reason is not filled");
+                                    return;
+                                }
+                                document.getElementById("actionButtons").hidden = true;
+                                document.getElementById("cancelReason").hidden = true;
+                                LLP.Common.SetAttributeValue(entityForm.entity, "pe_cancelreason", cancelReason.value);
+                                LLP.Common.SetAttributeValue(entityForm.entity, "satecode", Appointment.Enums.StateCode.Canceled);
+                                break;
+                            case "btnDoNotCloseTrue":
+                                LLP.Common.Attribute_SetValue(Appointment.Enums.DisplayName.General, "pe_donotclosevisit", true);
+                                Appointment.DoSave(function () {
+                                    Appointment.CheckStatusCode();
+                                });
+                                break;
+                            case "btnDoNotCloseFalse":
+                                LLP.Common.Attribute_SetValue(Appointment.Enums.DisplayName.General, "pe_donotclosevisit", false);
+                                Appointment.DoSave(function () {
+                                    Appointment.CheckStatusCode();
+                                });
+                                break;
+                        }
+
+                        Appointment.SetButtonsStates();
+                    },
+                    function (error) {
+                        LLP.LOG.Error(LLP.Enums.Module.Appointment, "OnClick_Button -> requestObject:", error);
+                    }, null);
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Appointment, "OnClick_Button:", e);
+                }
+            },
+            OnClick_SendToTLS: function() {
+                try {
+                    MobileCRM.UI.EntityForm.requestObject(function(entityForm) {
+
+                        var regardingid = LLP.Common.GetAttributeValue(entityForm.entity, "regardingobjectid");
+
+                        if (!regardingid) {
+                            MobileCRM.bridge.alert("Regarding is not set");
+                            return;
+                        }
+
+                        MobileCRM.DynamicEntity.loadById(regardingid.entityName, regardingid.id, function (regarding) {
+
+                            var xml =
+                            '<fetch>\
+		                        <entity name="llp_globalsetting">\
+                                    <attribute name="llp_text1" />\
+		                            <filter type="and">\
+			                            <condition attribute="llp_name" operator="eq" value="Phone calls from Visit to TLS" />\
+		                            </filter>\
+		                        </entity>\
+	                        </fetch>';
+
+                            MobileCRM.FetchXml.Fetch.deserializeFromXml(xml, function (fetch) {
+                                fetch.execute("DynamicEntities", function (setting) {
+                                    var values = [];
+                                    var ownerRef = null;
+                                    if(setting.length > 0) {
+                                        //lgicalname;name
+                                        var ownerDefinition = LLP.Common.GetAttributeValue(setting[0], "llp_text1");
+                                        if(ownerDefinition) {
+                                            values = ownerDefinition.split(';');
+                                        }
+                                    }
+                                    
+                                    if(values.length > 0) {
+                                        
+                                        var xml =
+                                                '<fetch>\
+		                                            <entity name="' + values[0] + '">\
+                                                        <attribute name="' + values[0] + 'id" />\
+                                                        <attribute name="name" />\
+		                                                <filter type="and">\
+			                                                <condition attribute="name" operator="eq" value="' + values[1] + '" />\
+		                                                </filter>\
+		                                            </entity>\
+	                                            </fetch>';
+
+                                        MobileCRM.FetchXml.Fetch.deserializeFromXml(xml, function (fetch) {
+                                            fetch.execute("DynamicEntities", function (owner) {
+                                                if(owner.length > 0) {
+                                                    ownerRef = new MobileCRM.Reference(owner[0].entityName, owner[0].id, owner[0].primaryName);
+                                                }
+
+                                                Appointment.CreatePhoneCall(regardingid, regarding, ownerRef);
+                                            }, MobileCRM.bridge.alert);
+                                        }, MobileCRM.bridge.alert);
+                                    }
+                                    else {
+                                        Appointment.CreatePhoneCall(regardingid, regarding, ownerRef);
+                                    }
+
+                                }, MobileCRM.bridge.alert);
+                            }, MobileCRM.bridge.alert);
+                        },
+                        function(error) {
+                            LLP.LOG.Error(LLP.Enums.Module.Appointment, "OnClick_SendToTLS", error);
+                        }, null);
+
+                        
+                    },
+                    function(error) {
+                        LLP.LOG.Error(LLP.Enums.Module.Appointment, "OnClick_SendToTLS", error);
+                    }, null);
+                    
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Appointment, "OnClick_SendToTLS", e);
+                }
+            },
+            CreatePhoneCall: function(regardingRef, regarding, ownerRef) {
+                try {
+                    MobileCRM.UI.EntityForm.requestObject(function (entityForm) {
+                        var date = new Date();
+                        date.setDate(date.getDate() + 1);
+
+                        var phonecall = MobileCRM.DynamicEntity.createNew("phonecall");
+                        LLP.Common.SetAttributeValue(phonecall, "subject", LLP.Common.GetAttributeValue(entityForm.entity, "subject"));
+                        LLP.Common.SetAttributeValue(phonecall, "from", [LLP.Common.GetAttributeValue(entityForm.entity, "ownerid")]);
+                        LLP.Common.SetAttributeValue(phonecall, "to", [regardingRef]);
+                        LLP.Common.SetAttributeValue(phonecall, "phonenumber", LLP.Common.GetAttributeValue(regarding, "telephone1"));
+                        LLP.Common.SetAttributeValue(phonecall, "directioncode", true); //outgoing
+                        LLP.Common.SetAttributeValue(phonecall, "regardingobjectid", regardingRef);
+                        LLP.Common.SetAttributeValue(phonecall, "scheduledend", date);
+                        LLP.Common.SetAttributeValue(phonecall, "statuscode", Appointment.Enums.PhoneCallStatusCode.SendtoTLS);
+                        
+                        if(ownerRef) {
+                            LLP.Common.SetAttributeValue(phonecall, "ownerid", ownerRef);
+                        }
+                        phonecall.save(function (err) {
+                            if (err) {
+                                LLP.LOG.Error(LLP.Enums.Module.Appointment, "CreatePhoneCall -> saving phonecall error", err);
+                                MobileCRM.bridge.alert(err);
+                            }
+                        });
+                    },
+                    function (error) {
+                        LLP.LOG.Error(LLP.Enums.Module.Appointment, "CreatePhoneCall -> MobileCRM.UI.EntityForm.requestObject", error);
+                    }, null);
+                }
+                catch(e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Appointment, "CreatePhoneCall", e);
+                }
+            },
+            CheckCanFinish: function(entityForm, callback) {
+                try {
+
+                    var regardingobjectid = LLP.Common.GetAttributeValue(entityForm.entity, "regardingobjectid");
+
+                    var xml =
+                            '<fetch>\
+		                    <entity name="pe_visitactivity">\
+                                <attribute name="pe_visitactivityid" />\
+		                        <filter type="and">\
+                                    <condition attribute="pe_accountid" operator="eq" value="' + regardingobjectid.id + '" />\
+                                    <condition attribute="statuscode" operator="eq" value="' + Appointment.Enums.ActivityStatusCode.Active + '" />\
+                                    <condition attribute="pe_mandatoryfrom" operator="le" value="' + LLP.Common.GetFetchDate(new Date()) + '" />\
+		                        </filter>\
+		                    </entity>\
+	                    </fetch>';
+
+                    MobileCRM.FetchXml.Fetch.deserializeFromXml(xml, function (fetch) {
+                        fetch.execute("DynamicEntities", function (result) {
+                            if (result.length > 0) {
+                                MobileCRM.bridge.alert("You can not close your visit. You haven´t finish all your mandatory activities.");
+                                return;
+                            }
+                            else {
+                                callback();
+                            }
+                        }, MobileCRM.bridge.alert);
+                    }, MobileCRM.bridge.alert);
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Appointment, "CheckCanFinish", e);
+                }
+            },
+            ChangeStatusCode: function (buttonId) {
+                try {
+                    if (buttonId.indexOf("btnDoNotClose") < 0 && buttonId != "btnCancel" && buttonId != "btnFinish" && Appointment.ButtonsStates[buttonId]) {
+                        var statusCode = Appointment.ButtonsStates[buttonId].statusCode;
+                        if (statusCode) {
+                            Appointment.SetStatusCode(statusCode);
+                        }
+                    }
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Appointment, "ChangeStatusCode:", e);
+                }
+            },
+            DoSave: function (callback) {
+                try {
+                    MobileCRM.UI.EntityForm.save();
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Appointment, "DoSave:", e);
+                }
+            },
+            OnLoad: function () {
+                try {
+                    document.getElementById("cancelReason").hidden = true;
+                    document.getElementById("actionButtons").hidden = true;
+                    MobileCRM.UI.EntityForm.requestObject(function (entityForm) {
+                        LLP.SetExecutionContext(entityForm);
+                        var statecode = LLP.Common.GetAttributeValue(entityForm.entity, "statuscode");
+                        if (statecode != Appointment.Enums.StatusCode.Completed && !LLP.Form.IsCreate()) {
+                            document.getElementById("actionButtons").hidden = false;
+                        }
+                        Appointment.CheckStatusCode();
+                        Appointment.SetButtonsStates();
+
+                        entityForm.setTabVisibility("Actions", !(document.getElementById("actionButtons").hidden && document.getElementById("cancelReason").hidden));
+                        LLP.Common.Attribute_Invisible(Appointment.Enums.DisplayName.General, "pe_donotclosevisit");
+                    },
+                    function (error) {
+                        LLP.LOG.Error(LLP.Enums.Module.Appointment, "OnLoad -> requestObject:", error);
+                    }, null);
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Appointment, "OnLoad:", e);
+                }
+            }
+        }
+
+        window.onload = Appointment.OnLoad;
+    </script>
+</body>
+</html>

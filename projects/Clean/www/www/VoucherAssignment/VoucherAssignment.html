@@ -1,0 +1,235 @@
+﻿<!DOCTYPE html>
+
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="utf-8" />
+    <title>Empty Offline HTML page</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="initial-scale=1, user-scalable=no" />
+    <script src="..\Common\JSBridge.js"></script>
+    <script src="..\Common\pe_GlobalCommonFunctions.js"></script>
+    <style>
+        label {
+            color: white;
+        }
+    </style>
+</head>
+<body>
+
+
+    <label id="logLabel"></label>
+    <script>
+       
+        //Task 4930
+        //        vzdy pro cteni a vzdy videt:
+        //            pe_campaignid
+
+        //        dale se vse ridi pres Status Reason, inicializacni formular bude vzdy assigned:
+        //            1) assigned
+        //            - Resco i CRM
+        //        smazat hodnotu pole: ownerid (rika kteremu obchodnikovi prirazuji ten pocet voucheru, zatim nerikam jake jen pocet)
+        //povinna pole: pe_count, pe_date, ownerid
+        //        videt pole:  pe_count, pe_date, ownerid
+        //        2) returned
+        //        povinna pole: pe_count, ownerid (ale zde nechat hodnotu, radku vytvari ten obchodnik), pe_date
+        //videt pole: pe_count, ownerid, pe_date
+        //        3) given to customer
+        //        povinna pole: pe_accountid, pe_date. pe_voucherid, pe_accountid
+        //        videt pole: pe_accountid, pe_date. pe_voucherid, pe_accountid
+        //        4) returned from Wholesaler
+        //        povinna pole: pe_date, pe_voucherid
+        //        videt pole: pe_date, pe_voucherid
+        //        prednastavit pole: pe_date = aktualni datum
+
+        var VoucherAssignment = VoucherAssignment || {
+            
+            Enums: {
+                // Detail view display name
+                DisplayName: {
+                    General: "General"
+                },
+                StatusCode: {
+                    Assigned: 1,
+                    Returned: 100000000,
+                    GivenToCustomer: 100000001,
+                    ReturnedFromWholesaler: 100000002,
+                    ToBeGiventoCustomer: 100000003,
+                    Cancelled: 100000004,
+                    Inactive: 2
+                }
+            },
+            IsChanging: false,
+            FilterStatusCode: function () {
+                try {
+                    MobileCRM.UI.EntityForm.requestObject(function (entityForm) {
+                        var detailView = entityForm.getDetailView("General");
+                        var statusCodeValue = LLP.Common.GetAttributeValue(entityForm.entity, "statuscode");
+                        var optionListValue = VoucherAssignment.GetListOptions(entityForm.entity.entityName, "statuscode");
+                        var filteredListValue = {};
+                        for (var item in optionListValue) {
+                            switch (optionListValue[item]) {
+                                case VoucherAssignment.Enums.StatusCode.ToBeGiventoCustomer:
+                                case VoucherAssignment.Enums.StatusCode.Cancelled:
+                                    filteredListValue[item] = optionListValue[item];
+                                    break;
+                            }
+                        }
+
+                        var itemIndex = detailView.getItemIndex("statuscode");
+                        detailView.updateComboItemDataSource(itemIndex, filteredListValue, "int", statusCodeValue);
+                    },
+                    function (error) {
+                        LLP.LOG.Error(LLP.Enums.Module.VoucherAssignment, "FilterStatusCode -> MobileCRM.UI.EntityForm.requestObject", error);
+                    }, null);
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.VoucherAssignment, "FilterStatusCode", e);
+                }
+            },
+            GetListOptions: function (entityName, propertyName) {
+                try {
+                    var result = {};
+                    var listOptions = MobileCRM.Metadata.getStringListOptions(entityName, propertyName);
+                    var searchVal = entityName + '.' + propertyName + '.';
+                    var searchValLen = searchVal.length;
+                    for (var i in MobileCRM.Localization.stringTable) {
+                        if (i && i.substr(0, searchValLen) == searchVal) {
+                            var val = parseInt(i.substr(searchValLen), 10);
+                            if (val > 0) {
+                                var st = MobileCRM.Localization.stringTable[i];
+                                result[st] = val;
+                            }
+                        }
+                    }
+                    return result;
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.VoucherAssignment, "GetListOptions", e);
+                }
+            },
+            SetEditability: function (entityForm)
+            {
+                try {
+                    var pe_processed = LLP.Common.GetAttributeValue(entityForm.entity, "pe_processed");
+                    if (pe_processed) {
+                        LLP.Form.Disabled(true);
+                    }
+                    else {
+                        LLP.Common.Attribute_Disabled(VoucherAssignment.Enums.DisplayName.General, "pe_campaignid");
+                        LLP.Common.Attribute_Disabled(VoucherAssignment.Enums.DisplayName.General, "pe_count");
+                        LLP.Common.Attribute_Enabled(VoucherAssignment.Enums.DisplayName.General, "pe_voucherid");
+                        LLP.Common.Attribute_Enabled(VoucherAssignment.Enums.DisplayName.General, "statuscode");
+                    }
+                } catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.VoucherAssignment, "CheckStatusAndSetFields: ", e);
+                }
+            },
+            CheckStatusCode: function (entityForm) {
+                try
+                {
+                    
+                        //var statusCode = LLP.Common.Attribute_GetValue(VoucherAssignment.Enums.DisplayName.General, "statuscode");
+
+                        //var fieldSettings =
+                        //{
+                        //    pe_accountid: { disabled: false, required: false, visible: false },
+                        //    pe_date: { disabled: false, required: true, visible: true },
+                        //    pe_campaignid: { disabled: false, required: false, visible: false },
+                        //    pe_orderbenefitid: { disabled: false, required: false, visible: false },
+                        //    pe_count: { disabled: false, required: false, visible: false },
+                        //    pe_voucherid: { disabled: false, required: false, visible: false },
+                        //    pe_name: { disabled: false, required: false, visible: false },
+                        //    statuscode: { disabled: false, required: false, visible: false },
+                        //    ownerid: { disabled: false, required: false, visible: false },
+                        //};
+
+                        //switch (statusCode) {
+                        //    case VoucherAssignment.Enums.StatusCode.Assigned:
+                        //        if (isChange || LLP.Form.IsCreate()) {
+                        //            LLP.Common.Attribute_SetValue(VoucherAssignment.Enums.DisplayName.General, "ownerid", null);
+                        //        }
+                        //    case VoucherAssignment.Enums.StatusCode.Returned:
+                        //    case VoucherAssignment.Enums.StatusCode.GivenToCustomer:
+                        //    case VoucherAssignment.Enums.StatusCode.ToBeGiventoCustomer:
+                        //    case VoucherAssignment.Enums.StatusCode.ReturnedFromWholesaler:
+                        //        fieldSettings.pe_accountid = { disabled: false, required: true, visible: true };
+                        //        fieldSettings.pe_date = { disabled: false, required: true, visible: true };
+                        //        fieldSettings.ownerid = { disabled: false, required: true, visible: true };
+                        //        fieldSettings.pe_voucherid = { disabled: false, required: false, visible: true };
+                        //        fieldSettings.pe_campaignid = { disabled: false, required: true, visible: true };
+                        //        fieldSettings.pe_count = { disabled: true, required: true, visible: true };
+
+                        //        break;
+                        //}
+
+                        //var attributes = Object.getOwnPropertyNames(fieldSettings);
+                        //for (var i = 0; i < attributes.length; i++) {
+                        //    var attrName = attributes[i];
+                        //    LLP.Common.Attribute_SetProperties(VoucherAssignment.Enums.DisplayName.General, attrName, fieldSettings[attrName].required, fieldSettings[attrName].visible, fieldSettings[attrName].disabled);
+                        //}
+                    
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.VoucherAssignment, "CheckStatusCode", e);
+                }
+            },
+            OnChange_VoucherId: function(entityForm) {
+                try {
+                    if (VoucherAssignment.IsChanging) {
+                        VoucherAssignment.IsChanging = false;
+                        return;
+                    }
+
+                    LLP.SetExecutionContext(entityForm);
+
+                    if(!LLP.Common.Attribute_GetValue(VoucherAssignment.Enums.DisplayName.General, "pe_voucherid")) {
+                        VoucherAssignment.IsChanging = true;
+                        LLP.Common.Attribute_SetValue(VoucherAssignment.Enums.DisplayName.General, "statuscode", VoucherAssignment.Enums.StatusCode.ToBeGiventoCustomer);
+                    }
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.VoucherAssignment, "OnChange_VoucherId", e);
+                }
+            },
+            OnChange_StatusCode: function (entityForm) {
+                try {
+                    if (VoucherAssignment.IsChanging) {
+                        VoucherAssignment.IsChanging = false;
+                        return;
+                    }
+
+                    LLP.SetExecutionContext(entityForm);
+
+                    if (LLP.Common.Attribute_GetValue(VoucherAssignment.Enums.DisplayName.General, "statuscode") == VoucherAssignment.Enums.StatusCode.Cancelled) {
+                        VoucherAssignment.IsChanging = true;
+                        LLP.Common.Attribute_SetValue(VoucherAssignment.Enums.DisplayName.General, "pe_voucherid", null);
+                    }
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.VoucherAssignment, "OnChange_StatusCode", e);
+                }
+            },
+            OnLoad: function () {
+                try
+                {
+                    MobileCRM.UI.EntityForm.onItemChange("statuscode", VoucherAssignment.OnChange_StatusCode, true, null);
+                    MobileCRM.UI.EntityForm.onItemChange("pe_voucherid", VoucherAssignment.OnChange_VoucherId, true, null);
+                    MobileCRM.UI.EntityForm.requestObject(function (entityForm) {
+                        LLP.SetExecutionContext(entityForm);
+                        VoucherAssignment.SetEditability(entityForm);
+                    });
+                    MobileCRM.Localization.initialize(VoucherAssignment.FilterStatusCode, MobileCRM.bridge.alert, null);
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.VoucherAssignment, "OnLoad: ", e);
+                }
+            }
+        }
+
+        window.onload = function () {
+            VoucherAssignment.OnLoad();
+        }
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,243 @@
+﻿<!DOCTYPE html>
+
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="utf-8" />
+    <title>Empty Offline HTML page</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="initial-scale=1, user-scalable=no" />
+    <script src="..\Common\JSBridge.js"></script>
+    <script src="..\Common\pe_GlobalCommonFunctions.js"></script>
+    <script src="..\Common\jquery-3.3.1.min.js"></script>
+    <script src="..\Common\popper.min.js"></script>
+    <script src="..\Common\bootstrap.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="..\Common\bootstrap.min.css">
+</head>
+<body>
+
+    <div class="container mt-1">
+        <div class="row">
+            <button id="btnSave" class="btn btn-primary btn-block" onclick="MASegmentationOn.OnClick_Save();">Save</button>
+        </div>
+        <div class="row mt-2">
+            <button id="btnCompleted" class="btn btn-primary btn-block" onclick="MASegmentationOn.OnClick_Completed();">Completed</button>
+        </div>
+    </div>
+
+    <script>
+        //Task 5267 |
+        //----------
+        //Nastav povinnosti atributů na formuláři (Default) entity MA - Segmentation ON - sekce Volume Segment
+
+        //1) V případě, že pe_v1 = True, nastav povinné pole:
+        //pe_v3
+        //pe_v4
+        //pe_v5
+
+        //2) V případě, že pe_v6 = True, nastav povinné pole:
+        //pe_v8
+        //pe_v9
+        //pe_v10
+
+        //3) V případě, že pe_v11 = True, nastav povinné pole:
+        //pe_v13
+        //pe_v14
+        //pe_v15
+
+        //4) V případě, že pe_v16 = True, nastav povinné pole:
+        //pe_v18
+        //pe_v19
+        //pe_v20
+
+        var MASegmentationOn = MASegmentationOn || {
+            Enums: {
+                // Detail view display name
+                DisplayViewName: {
+                    General: "General",
+                    VolumeSegment: "Volume Segment"
+                },
+                StatusCode: {
+                    Active: 1,
+                    Completed: 100000000,
+                    Inactive: 2
+                }
+            },
+            RequiredFieldsBasedOnValue: [{
+                PrimaryFieldName: "pe_v1",
+                MatchValue: true,
+                Fields: ["pe_v3", "pe_v4", "pe_v5"]
+            },
+                {
+                    PrimaryFieldName: "pe_v6",
+                    MatchValue: true,
+                    Fields: ["pe_v8", "pe_v9", "pe_v10"]
+                },
+                {
+                    PrimaryFieldName: "pe_v11",
+                    MatchValue: true,
+                    Fields: ["pe_v13", "pe_v14", "pe_v15"]
+                },
+                {
+                    PrimaryFieldName: "pe_v16",
+                    MatchValue: true,
+                    Fields: ["pe_v18", "pe_v19", "pe_v20"]
+                }],
+            SetToCompleted: false,
+            SetRequiredFields: function ()
+            {
+                try {
+                    for (var i = 0; i < MASegmentationOn.RequiredFieldsBasedOnValue.length; i++) {
+                        var obj = MASegmentationOn.RequiredFieldsBasedOnValue[i];
+                        var value = LLP.Common.Attribute_GetValue(MASegmentationOn.Enums.DisplayViewName.VolumeSegment, obj.PrimaryFieldName);
+                        var required = value == obj.MatchValue;
+                        for (var j = 0; j < obj.Fields.length; j++) {
+                            LLP.Common.Attribute_IsRequired(MASegmentationOn.Enums.DisplayViewName.VolumeSegment, obj.Fields[j], required);
+                        }
+                    }
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.MASegmentationOn, "SetRequiredFields", e);
+                }
+            },
+            SetEditability: function (entityForm)
+            {
+                try {
+                    var disabled = false;
+                    if (LLP.Common.GetAttributeValue(entityForm.entity, "statuscode") == MASegmentationOn.Enums.StatusCode.Completed) {
+                        LLP.Form.Disabled();
+                        LLP.HtmlControl.SetDisabled("btnSave", true);
+                        LLP.HtmlControl.SetDisabled("btnCompleted", true);
+                    }
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.MAOtherOff, "SetEditability", e);
+                }
+            },
+            SetCompleted: function (entity)
+            {
+                LLP.Common.SetAttributeValue(entity, "statuscode", MASegmentationOn.Enums.StatusCode.Completed);
+            },
+            OnClick_Save: function ()
+            {
+                try {
+                    MobileCRM.UI.EntityForm.save();
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.MASegmentationOn, "Save", e);
+                }
+            },
+            OnClick_Completed: function ()
+            {
+                try {
+                    MobileCRM.UI.EntityForm.requestObject(function (entityForm)
+                    {
+                        if (!entityForm.isDirty) {
+                            MASegmentationOn.SetCompleted(entityForm.entity);
+                        }
+                        else {
+                            MASegmentationOn.SetToCompleted = true;
+                        }
+
+                        MobileCRM.UI.EntityForm.save();
+                    },
+                    function (error)
+                    {
+                        LLP.LOG.Error(LLP.Enums.Module.MASegmentationOn, "Completed -> MobileCRM.UI.EntityForm.requestObject", error);
+                    }, null);
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.MASegmentationOn, "Completed", e);
+                }
+            },
+            OnChange_Value: function (entityForm)
+            {
+                try {
+                    LLP.SetExecutionContext(entityForm);
+                    MASegmentationOn.SetRequiredFields();
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.MASegmentationOn, "OnChange_Value", e);
+                }
+            },
+            OnLoad: function ()
+            {
+                try {
+                    MobileCRM.UI.EntityForm.onSave(MASegmentationOn.OnSave, true, null);
+                    MobileCRM.UI.EntityForm.onPostSave(MASegmentationOn.OnPostSave, true, null);
+                    MobileCRM.UI.EntityForm.onItemChange("pe_v1", MASegmentationOn.OnChange_Value, true, null);
+                    MobileCRM.UI.EntityForm.onItemChange("pe_v6", MASegmentationOn.OnChange_Value, true, null);
+                    MobileCRM.UI.EntityForm.onItemChange("pe_v11", MASegmentationOn.OnChange_Value, true, null);
+                    MobileCRM.UI.EntityForm.onItemChange("pe_v16", MASegmentationOn.OnChange_Value, true, null);
+
+                    MobileCRM.UI.EntityForm.requestObject(function (entityForm)
+                    {
+                        LLP.SetExecutionContext(entityForm);
+                        MASegmentationOn.SetRequiredFields();
+                        MASegmentationOn.SetEditability(entityForm);
+                    });
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.MASegmentationOn, "OnLoad", e);
+                }
+            },
+            OnSave: function (entityForm)
+            {
+                try {
+                    if (MASegmentationOn.SetToCompleted) {
+                        MASegmentationOn.SetCompleted(entityForm.entity);
+                    }
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.MASegmentationOn, "OnSave", e);
+                }
+            },
+            OnPostSave: function (entityForm)
+            {
+                try {
+                    MASegmentationOn.UpdateVisitActivity(MASegmentationOn.SetToCompleted, entityForm.entity)
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.MASegmentationOn, "OnPostSave", e);
+                }
+            },
+
+            UpdateVisitActivity: function (setToCompleted, entity)
+            {
+                try {
+                    var entityRef = new MobileCRM.Reference(entity.entityName, entity.id, entity.primaryName);
+                    var pe_VisitActivityRef = LLP.Common.GetAttributeValue(entity, "pe_visitactivityid");
+                    var pe_visitactivityEdit = new MobileCRM.DynamicEntity.createNew("pe_visitactivity");
+                    pe_visitactivityEdit.isNew = false;
+                    pe_visitactivityEdit.id = pe_VisitActivityRef.id;
+
+                    if (setToCompleted) {
+                        LLP.Common.SetAttributeValue(pe_visitactivityEdit, "pe_lastrun", new Date());
+                        LLP.Common.SetAttributeValue(pe_visitactivityEdit, "statuscode", 100000000); // completed
+                    }
+
+                    LLP.Common.SetAttributeValue(pe_visitactivityEdit, "pe_masegmentationonid", entityRef);
+
+                    pe_visitactivityEdit.save(
+                         function (err)
+                         {
+                             if (err) {
+                                 LLP.LOG.Error(LLP.Enums.Module.MASegmentationOn, "Error Save pe_visitactivityEdit -> callback: ", err);
+                             }
+                         }
+                    );
+
+
+                } catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.MASegmentationOn, "OnPostSave", e);
+                }
+
+            }
+        }
+
+        window.onload = function () {
+            MASegmentationOn.OnLoad();
+        }
+
+    </script>
+</body>
+</html>

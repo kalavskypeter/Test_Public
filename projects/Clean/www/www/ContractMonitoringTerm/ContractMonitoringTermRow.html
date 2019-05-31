@@ -1,0 +1,75 @@
+﻿<!DOCTYPE html>
+
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="utf-8" />
+    <title>Empty Offline HTML page</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="initial-scale=1, user-scalable=no" />
+    <script src="..\Common\JSBridge.js"></script>
+    <script src="..\Common\pe_GlobalCommonFunctions.js"></script>
+</head>
+<body>
+    <script>
+
+        //Task 5273 |
+        //----------
+        //Resco
+        //---
+        //entita: pe_contractmonitoring
+        //---
+        //a) nastavit statuscode jen pro cteni
+        //b) vytvorit tlacitko "Completed"
+        //- aktivni jen pokud je statuscode=100,000,000 (draft)
+        //- jinak je tlacitko neaktivni
+        //c) tlacitko bude delat:
+        //    - pri kliknuti na tlacitko se nastavi statuscode=2 (completed, puvodni prejmenovane Inactive)
+        //    - nastavi vsechny radky jako inactive-asi mame? ale nefunguje to..je tam editovatelne view, takze prepnout view na:
+        //        Active Contract Monitoring Terms - Read Only (to uz umime)
+
+        var ContractMonitoringTermRow = ContractMonitoringTermRow || {
+            Enums: {
+                CMStatusCode:
+                {
+                    Completed: 1,
+                    Draft: 100000000,
+                    Cancelled: 100000001,
+                    Inactive: 2
+                },
+            },
+            CheckContractMonitoringStatusCode: function(statusCode) {
+                try {
+                    if (statusCode == ContractMonitoringTermRow.Enums.CMStatusCode.Completed) {
+                        MobileCRM.UI.EntityList.selectView("Active Contract Monitoring Terms - Read Only");
+                    }
+                    else {
+                        MobileCRM.UI.EntityList.selectView("Active Contract Monitoring Terms - Row script");
+                    }
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.ContractMonitoringTermRow, "CheckContractMonitoringStatusCode", e);
+                }
+            },
+            OnLoad: function () {
+                try {
+                    MobileCRM.UI.EntityList.requestObject(function (entityList) {
+                        var statucode = LLP.Common.GetAttributeValue(entityList.relationship.target, "statuscode");
+                        ContractMonitoringTermRow.CheckContractMonitoringStatusCode(statucode);
+                    },
+                    function (error) {
+                        LLP.LOG.Error(LLP.Enums.Module.ContractMonitoringTermRow, "OnLoad -> MobileCRM.UI.EntityList.requestObject", error);
+                    }, null);
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.ContractMonitoringTermRow, "OnLoad", e);
+                }
+            }
+        }
+
+        window.onload = function () {
+            ContractMonitoringTermRow.OnLoad();
+        }
+        
+    </script>
+</body>
+</html>

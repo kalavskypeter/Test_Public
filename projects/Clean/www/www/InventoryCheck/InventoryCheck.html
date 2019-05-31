@@ -1,0 +1,510 @@
+﻿<!DOCTYPE html>
+
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="utf-8" />
+    <title>Empty Offline HTML page</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="initial-scale=1, user-scalable=no" />
+    <script src="..\Common\JSBridge.js"></script>
+    <script src="..\Common\pe_GlobalCommonFunctions.js"></script>
+    <script src="..\Common\jquery-3.3.1.min.js"></script>
+    <script src="..\Common\popper.min.js"></script>
+    <script src="..\Common\bootstrap.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="..\Common\bootstrap.min.css" />
+</head>
+<body onload="InventoryCheck.OnLoad();">
+    
+    <div class="container mt-2">
+        <div class="row">
+            <div class="col">
+                <button id="btnComplete" class="btn btn-primary btn-block" onclick="InventoryCheck.OnClick_Complete();">Completed</button>
+            </div>
+        </div>
+    </div>
+    <label id="logLabel"></label>
+
+    <script>
+
+        // Task 4682
+        // ---------
+        // Pri manualnim zalozeni zaznamu Inventory Check v Resco se po ulozeni musi automaticky vytvorit radky v Inventory Check Lines, ktere odpovidaji vsem Customer Assets, ktere ma na sebe dany Account navazane. V potaz bereme pouze aktivni Customer Assets. 
+        // Do radku se musi nakopirovat odkaz na Customer Asset a pocet ks.
+           
+        // ======
+        // ODV:
+        // pri vytvoreni noveho zaznamu: pe_inventorycheck
+        // podivat se na lookup: pe_accountid
+        // - z neho ci nacist guid a podivat se do entity: msdyn_customerasset
+        // a nacist z ni vsechny aktivni zaznamy, kde je v lookupu msdyn_account ten stejny guide
+           
+        // je potreba vytvorit presne tolik zaznamu typu: pe_inventorycheckline
+        // kolik nactu zaznamu v msdyn_customerasset
+        // kazdy vytvoreny zaznam vyplnit temito hodnotami: 
+        // pe_inventorycheckline.pe_inventorycheckid = pe_inventorycheck (hlavicka)
+        // pe_inventorycheckline.pe_customerassetid = msdyn_customerasset[account]
+        // pe_inventorycheckline.pe_productid = msdyn_customerasset.msdyn_product
+        // pe_inventorycheckline.pe_quantity = msdyn_customerasset.pe_quantity
+        // pe_inventorycheckline.statuscode = 1
+           
+        // =====
+        // je potreba vedet, ze vyvolani akce muze byt manualne nebo planovane pres WF Scheduler
+        // - pokud by byl nejaky plugin, ktery by hlidal vytvoreni hlavicky a doplnoval radky po vytvoreni hlavicky, 
+        // stacilo by defacto vzdy (rucne, WF Scheduler) zalozit hlavicku a konec
+        // - ale u Resca WF Scheduler bude pushovat data do Resca z CRM
+        //**************************************************************************************************************
+        //Task 5272 |
+        //----------
+        //Resco
+        //---
+        //entita: pe_inventorycheck
+        //- prehodil jsem statuscode, tak kdyztak pozor :)
+        //---
+        //a)opet standard: vytvorit tlacitko "Completed"
+        //- aktivni pouze pokud je statuscode==draft
+        //b) vzdy pro cteni bude statuscode
+        //c)
+        //- pokud kliknu na tlacitko, nastavit statuscode = completed
+        //- nastavit inactive radky (To asi mame)
+        //- nastavit readonly na tyto pole:
+        //    pe_name
+        //pe_accountid
+        //pe_contactid
+        //pe_dateofinventorychek
+        //pe_warehouseid
+        //pe_notes
+        //d) na registraci pluginu chybi pre-image s polem pe_accountid
+        //e) pridat standardni quick view na Account, umistit ho pod Account
+
+        var InventoryCheck = InventoryCheck || {
+            Assets: null,
+            Enums: {
+                StatusCode:
+                {
+                    Draft: 1,
+                    Completed: 100000000,
+                    Inactive: 2
+                },
+                InventoryCheckLineStatusCode: {
+                    TobeChecked: 1
+                },
+                // Detail view display name
+                DisplayViewName: {
+                    General: "General"
+                }
+            },
+            SetToCompleted: false,
+            // Get msdyn_customerasset by selected accountu pe_accountid, Inventory check lines are created by these items
+            GetAccountAssets: function (entity, callback) {
+                try {
+                    var pe_accountidRef = LLP.Common.GetAttributeValue(entity, "pe_accountid");
+
+                    var xml =
+                            '<fetch>\
+		                    <entity name="msdyn_customerasset">\
+                            <attribute name="msdyn_customerassetid" />\
+                            <attribute name="msdyn_name" />\
+                            <attribute name="msdyn_product" />\
+		                    <attribute name="pe_quantity" />\
+                            <attribute name="createdon" />\
+		                    <order attribute="msdyn_name" descending="false" />\
+		                    <filter type="and">\
+			                    <condition attribute="msdyn_account" operator="eq" value="' + pe_accountidRef.id + '" />\
+		                    </filter>\
+		                    </entity>\
+	                    </fetch>';
+
+                    MobileCRM.FetchXml.Fetch.deserializeFromXml(xml, function (fetch) {
+                        fetch.execute("DynamicEntities", function (assets) {
+                            InventoryCheck.Assets = assets;
+                            callback();
+                        }, MobileCRM.bridge.alert);
+                    }, MobileCRM.bridge.alert);
+                } catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.InventoryCheck, "GetAccountAssets", e);
+                }
+            },
+            InventoryCheckLinesExists: function (entity, postSaveHandler, createLinesCallback) {
+                try {
+                    if (LLP.Common.Attribute_GetValue(InventoryCheck.Enums.DisplayViewName.General, "statuscode") != InventoryCheck.Enums.StatusCode.Draft) {
+                        if (postSaveHandler) {
+                            postSaveHandler.resumePostSave();
+                        }
+                        return;
+                    }
+
+                    var fetchEntity = new MobileCRM.FetchXml.Entity("pe_inventorycheckline");
+                    fetchEntity.addAttribute("pe_inventorychecklineid");
+                    var filter = new MobileCRM.FetchXml.Filter();
+                    filter.where("pe_inventorycheckid", "eq", entity.id);
+                    fetchEntity.filter = filter;
+                    var fetch = new MobileCRM.FetchXml.Fetch(fetchEntity);
+                    fetch.execute(
+                        null, // Take the results as an array of arrays with field values
+                        function (result) {
+                            if (result.length == 0) {
+                                InventoryCheck.GetAccountAssets(entity, function () {
+                                    createLinesCallback(entity);
+                                });
+                            }
+                            else if (postSaveHandler != null) {
+                                postSaveHandler.resumePostSave();
+                            }
+                        },
+                        function (error) {
+                            LLP.LOG.Error(LLP.Enums.Module.InventoryCheck, "InventoryCheckLinesExists -> fetch.execute", error);
+                        }
+                    );
+                } catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.InventoryCheck, "InventoryCheckLinesExists: ", e);
+                }
+            },
+            CreateInventoryCheckLines: function (entity, postSaveHandler) {
+
+                try {
+                    InventoryCheck.InventoryCheckLinesExists(entity, postSaveHandler, function (entity) {
+
+                        var pe_inventorycheckRef = new MobileCRM.Reference(entity.entityName, entity.id, entity.primaryName);
+
+                        // Task 4788
+                        // jako vzdy, prosim plnit pole:
+                        // pe_inventorycheckline.pe_name = CreatedOn - pe_customerassetid - pe_productid - pe_quantity
+                        // (bud je vyplneno customer asset nebo product id - neresit logiku, ze muze vzniknout 2018-01-23 - - produkt)
+
+                        var error = false;
+
+                        for (var i = 0; i < InventoryCheck.Assets.length; i++) {
+
+                            try {
+                                var quantity = InventoryCheck.GetQuantity(LLP.Common.GetAttributeValue(InventoryCheck.Assets[i], "pe_quantity"));
+                                var name = InventoryCheck.GetDate(new Date());
+                                name += " - " + LLP.Common.GetAttributeValue(InventoryCheck.Assets[i], "msdyn_name");
+                                name += " - " + LLP.Common.GetAttributeValue(InventoryCheck.Assets[i], "msdyn_product").primaryName;
+                                name += " - " + quantity;
+                                var pe_inventorycheckline = new MobileCRM.DynamicEntity.createNew("pe_inventorycheckline");
+                                LLP.Common.SetAttributeValue(pe_inventorycheckline, "pe_name", name);
+                                LLP.Common.SetAttributeValue(pe_inventorycheckline, "pe_inventorycheckid", pe_inventorycheckRef);
+                                LLP.Common.SetAttributeValue(pe_inventorycheckline, "pe_customerassetid", new MobileCRM.Reference(InventoryCheck.Assets[i].entityName, InventoryCheck.Assets[i].id, InventoryCheck.Assets[i].primaryName));
+                                LLP.Common.SetAttributeValue(pe_inventorycheckline, "pe_productid", LLP.Common.GetAttributeValue(InventoryCheck.Assets[i], "msdyn_product"));
+                                LLP.Common.SetAttributeValue(pe_inventorycheckline, "pe_quantity", quantity);
+                                LLP.Common.SetAttributeValue(pe_inventorycheckline, "pe_originalquantity", quantity);
+                                LLP.Common.SetAttributeValue(pe_inventorycheckline, "statuscode", InventoryCheck.Enums.InventoryCheckLineStatusCode.TobeChecked);
+
+                                pe_inventorycheckline.save(
+                                    function (err) {
+                                        if (err) {
+                                            LLP.LOG.Error(LLP.Enums.Module.InventoryCheck, "CreateInventoryCheckLines -> callback: ", err);
+                                            error = true;
+                                        }
+                                    }
+                                );
+                            }
+                            catch (e) {
+                                error = true;
+                            }
+                        }
+
+                        if (!error) {
+                            if (InventoryCheck.Assets.length > 0) {
+                                LLP.Common.SetAttributeValue(entity, "pe_rowsgeneratedon", new Date());
+                                entity.save(function (err) {
+                                    if (err) {
+                                        LLP.LOG.Error(LLP.Enums.Module.InventoryCheck, "CreateInventoryCheckLines -> callback -> Set pe_rowsgeneratedon: ", err);
+                                        error = true;
+                                    } else if (postSaveHandler) {
+                                        postSaveHandler.resumePostSave();
+                                    }
+                                });
+                            }
+                            else if (postSaveHandler) {
+                                postSaveHandler.resumePostSave();
+                            }
+                        } else {
+                            MobileCRM.bridge.alert("Error, post save skipped");
+                        }
+                    });
+                } catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.InventoryCheck, "CreateInventoryCheckLines", e);
+                }
+            },
+            GetDate: function (date) {
+                return date.getFullYear() + "/" + (date.getMonth() + 1) + "/" + date.getDate();
+            },
+            GetQuantity: function (quantity) {
+                if (LLP.Common.IsNullOrEmpty(quantity)) {
+                    return 0;
+                }
+
+                return quantity;
+            },
+            SetEditability: function () {
+                var currentAttribute = null;
+                try {
+                    LLP.Common.Attribute_Disabled(InventoryCheck.Enums.DisplayViewName.General, "statuscode");
+
+                    var accountdetail = LLP.Common.Attribute_Get(InventoryCheck.Enums.DisplayViewName.General, "accountdetail");
+                    if (accountdetail) {
+                        LLP.Common.Attribute_Disabled(InventoryCheck.Enums.DisplayViewName.General, "accountdetail");
+                    }
+
+                    var statuscode = LLP.Common.Attribute_GetValue(InventoryCheck.Enums.DisplayViewName.General, "statuscode");
+                    var disabled = statuscode == InventoryCheck.Enums.StatusCode.Completed;
+                    var attributes = ["pe_name", "pe_accountid", "pe_contactid", "pe_dateofinventorychek", "pe_warehouseid", "pe_notes"];
+
+                    LLP.HtmlControl.SetDisabled("btnComplete", disabled);
+
+                    for (var i = 0; i < attributes.length; i++) {
+                        currentAttribute = attributes[i];
+                        LLP.Common.Attribute_IsDisabled(InventoryCheck.Enums.DisplayViewName.General, attributes[i], disabled);
+                    }
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.InventoryCheck, "SetEditability", e + " Attribute: " + currentAttribute);
+                }
+            },
+            SetAccountDetailValues: function (entityForm, callback) {
+                try {
+                    if (entityForm) {
+                        LLP.SetExecutionContext(entityForm);
+                    }
+
+                    var pe_accountid = LLP.Common.Attribute_GetValue(InventoryCheck.Enums.DisplayViewName.General, "pe_accountid");
+
+                    if (pe_accountid) {
+                        var pe_account = MobileCRM.DynamicEntity.loadById(pe_accountid.entityName, pe_accountid.id,
+                            function (result) {
+                                MobileCRM.UI.EntityForm.requestObject(function (entityForm) {
+                                    LLP.SetExecutionContext(entityForm);
+                                    var addTextBox = false;
+                                    var textbox = LLP.Common.Attribute_Get(InventoryCheck.Enums.DisplayViewName.General, "accountdetail");
+                                    if (!textbox) {
+                                        addTextBox = true;
+                                        textbox = new MobileCRM.UI.DetailViewItems.TextBoxItem("accountdetail", "Account Detail");
+                                        textbox.isEnabled = false;
+                                        textbox.maxLength = 5000;
+                                        textbox.numberOfLines = 5;
+                                        textbox.style = "MultiLine";
+                                    }
+
+                                    textbox.value = "";
+                                    InventoryCheck.AddValueToMultiline(textbox, "Customer ID: ", LLP.Common.GetAttributeValue(result, "msdyn_externalaccountid"), false);
+                                    InventoryCheck.AddValueToMultiline(textbox, "Address: ", LLP.Common.GetAttributeValue(result, "address1_line1"), true);
+                                    InventoryCheck.AddValueToMultiline(textbox, ", ", LLP.Common.GetAttributeValue(result, "address1_city"), false, true);
+                                    InventoryCheck.AddValueToMultiline(textbox, ", ", LLP.Common.GetAttributeValue(result, "address1_postalcode"), false, true);
+                                    InventoryCheck.AddValueToMultiline(textbox, ", ", LLP.Common.GetAttributeValue(result, "address1_country"), false, true);
+                                    InventoryCheck.AddValueToMultiline(textbox, "Area: ", LLP.Common.GetAttributeValue(result, "pe_areaid"), true);
+                                    InventoryCheck.AddValueToMultiline(textbox, "District: ", LLP.Common.GetAttributeValue(result, "territoryid"), true);
+                                    InventoryCheck.AddValueToMultiline(textbox, "Region: ", LLP.Common.GetAttributeValue(result, "pe_regionid"), true);
+
+                                    if (addTextBox) {
+                                        var detailView = entityForm.getDetailView(InventoryCheck.Enums.DisplayViewName.General);
+                                        var index = detailView.getItemIndex("pe_accountid");
+                                        detailView.insertItem(textbox, index + 1);
+                                    }
+                                    else {
+                                        LLP.Common.Attribute_Visible(InventoryCheck.Enums.DisplayViewName.General, "accountdetail");
+                                    }
+
+                                    if (callback) {
+                                        callback();
+                                    }
+                                },
+                                function (error) {
+                                    LLP.LOG.Error(LLP.Enums.Module.InventoryCheck, "SetAccountDetailValues -> MobileCRM.UI.EntityForm.requestObject:", error);
+                                }, null);
+
+                            },
+                            function (error) {
+                                LLP.LOG.Error(LLP.Enums.Module.InventoryCheck, "SetAccountDetailValues -> load account MobileCRM.DynamicEntity.loadById (" + pe_accountid.id + "):", error);
+                            }, null);
+                    }
+                    else {
+                        var textbox = LLP.Common.Attribute_Get(InventoryCheck.Enums.DisplayViewName.General, "accountdetail");
+                        if (textbox) {
+                            LLP.Common.Attribute_Invisible(InventoryCheck.Enums.DisplayViewName.General, "accountdetail");
+                        }
+                    }
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.InventoryCheck, "SetAccountDetailValues:", e);
+                }
+            },
+            AddValueToMultiline: function (control, text, value, newLine, textIsDelimiter) {
+
+                if (!control.value) {
+                    control.value = "";
+                }
+
+                if (newLine) {
+                    control.value += "\n";
+                }
+
+                if (!textIsDelimiter) {
+                    control.value += text;
+                }
+
+                if (value && textIsDelimiter) {
+                    control.value += text + value;
+                }
+                else if (value) {
+                    control.value += value;
+                }
+            },
+            SetCompleted: function() {
+                LLP.Common.Attribute_SetValue(InventoryCheck.Enums.DisplayViewName.General, "statuscode", InventoryCheck.Enums.StatusCode.Completed);
+            },
+            OnClick_Complete: function () {
+                try {
+                    InventoryCheck.SetToCompleted = true;
+                    MobileCRM.UI.EntityForm.requestObject(function (entityForm) {
+                        LLP.SetExecutionContext(entityForm);
+                        
+                        var xml =
+                            '<fetch>\
+		                        <entity name="pe_inventorycheckline">\
+                                    <attribute name="pe_inventorychecklineid" />\
+		                            <filter type="and">\
+                                        <condition attribute="pe_inventorycheckid" operator="eq" value="' + entityForm.entity.id + '" />\
+			                            <condition attribute="statuscode" operator="eq" value="' + InventoryCheck.Enums.InventoryCheckLineStatusCode.TobeChecked + '" />\
+		                            </filter>\
+		                        </entity>\
+	                        </fetch>';
+
+                        MobileCRM.FetchXml.Fetch.deserializeFromXml(xml, function (fetch) {
+                            fetch.execute("DynamicEntities", function (result) {
+                                if (result.length > 0) {
+                                    MobileCRM.bridge.alert("Some lines are to be checked");
+                                }
+                                else {
+                                    MobileCRM.UI.EntityForm.requestObject(function (entityForm) {
+                                        LLP.SetExecutionContext(entityForm);
+                                        if (!entityForm.isDirty) {
+                                            InventoryCheck.SetCompleted();
+                                        }
+                                        
+                                        MobileCRM.UI.EntityForm.save();
+                                    },
+                                    function (error) {
+                                        LLP.LOG.Error(LLP.Enums.Module.InventoryCheck, "OnClick_Complete -> MobileCRM.UI.EntityForm.requestObject", error);
+                                    }, null);
+                                }
+                            }, MobileCRM.bridge.alert);
+                        }, MobileCRM.bridge.alert);
+                    },
+                    function (error) {
+                        LLP.LOG.Error(LLP.Enums.Module.InventoryCheck, "OnClick_Complete -> MobileCRM.UI.EntityForm.requestObject", error);
+                    }, null)
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.InventoryCheck, "OnClick_Complete", e);
+                }
+            },
+            // ON LOAD FORM
+            OnLoad: function () {
+                try {
+                    MobileCRM.UI.EntityForm.onItemChange("pe_accountid", InventoryCheck.SetAccountDetailValues, true, null);
+                    MobileCRM.UI.EntityForm.requestObject(
+                        function (entityForm) {
+                            try {
+
+                                LLP.SetExecutionContext(entityForm);
+
+                                entityForm.setTabVisibility("Actions", !LLP.Form.IsCreate());
+
+                                MobileCRM.UI.EntityForm.onSave(InventoryCheck.OnSave, true, null);
+
+                                if (LLP.Form.IsCreate()) {
+                                    LLP.Common.Attribute_Invisible(InventoryCheck.Enums.DisplayViewName.General, "statuscode");
+                                } else if (LLP.Common.IsNullOrEmpty(LLP.Common.GetAttributeValue(entityForm.entity, "pe_rowsgeneratedon"))) {
+                                    InventoryCheck.CreateInventoryCheckLines(entityForm.entity);
+                                }
+
+                                MobileCRM.Metadata.getOptionSetValues(
+                                    "pe_inventorycheck",
+                                    "statuscode",
+                                    function (optionSetValues) {
+
+                                        var filtered = [optionSetValues[0], optionSetValues[2]];
+
+                                        var detailView = entityForm.getDetailView("General");
+                                        var itemIndex = detailView.getItemIndex("statuscode");
+                                        if (itemIndex >= 0)
+                                            detailView.updateComboItemDataSource(itemIndex, filtered);
+                                    }, MobileCRM.bridge.alert, null);
+
+                                InventoryCheck.SetAccountDetailValues(null, function () {
+                                    InventoryCheck.SetEditability();
+                                });
+
+                            } catch (e) {
+                                LLP.LOG.Error(LLP.Enums.Module.InventoryCheck, "OnLoad -> MobileCRM.UI.EntityForm.requestObject -> callback:", e);
+                            }
+                        },
+                        function (errorMessage) {
+                            LLP.LOG.Error(LLP.Enums.Module.InventoryCheck, "OnLoad -> MobileCRM.UI.EntityForm.requestObject:", errorMessage);
+                        }
+                    );
+
+                    MobileCRM.UI.EntityForm.onPostSave(InventoryCheck.OnPostSave, true, null);
+                } catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.InventoryCheck, "OnLoad:", e);
+                }
+            },
+            OnSave: function (entityForm) {
+                LLP.SetExecutionContext(entityForm);
+                if (!LLP.Common.IsVisible(InventoryCheck.Enums.DisplayViewName.General, "statuscode")) {
+                    LLP.Common.Attribute_Visible(InventoryCheck.Enums.DisplayViewName.General, "statuscode");
+                }
+                if (InventoryCheck.SetToCompleted) {
+                    InventoryCheck.SetCompleted();
+                }
+            },
+            OnPostSave: function (entityForm) {
+                try {
+                    var postSuspend = entityForm.suspendPostSave();
+                    InventoryCheck.CreateInventoryCheckLines(entityForm.entity, postSuspend);
+                    InventoryCheck.UpdateVisitActivity(InventoryCheck.SetToCompleted, entityForm.entity)
+                } catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.InventoryCheck, "OnPostSave", e);
+                }
+            },
+
+            UpdateVisitActivity: function (setToCompleted, entity)
+            {
+                try {
+
+                    if (setToCompleted) {
+                        var pe_VisitActivityRef = LLP.Common.GetAttributeValue(entity, "pe_visitactivityid");
+
+                        if (LLP.Common.IsNullOrEmpty(pe_VisitActivityRef)) {
+                            return;
+                        }
+
+                        var pe_visitactivityEdit = new MobileCRM.DynamicEntity.createNew("pe_visitactivity");
+                        pe_visitactivityEdit.isNew = false;
+                        pe_visitactivityEdit.id = pe_VisitActivityRef.id;
+
+
+                        LLP.Common.SetAttributeValue(pe_visitactivityEdit, "pe_lastrun", new Date());
+                        LLP.Common.SetAttributeValue(pe_visitactivityEdit, "statuscode", 100000000); // completed
+
+
+                        pe_visitactivityEdit.save(
+                             function (err)
+                             {
+                                 if (err) {
+                                     LLP.LOG.Error(LLP.Enums.Module.InventoryCheck, "Error Save pe_visitactivityEdit -> callback: ", err);
+                                 }
+                             }
+                        );
+                    }
+                } catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.InventoryCheck, "OnPostSave", e);
+                }
+
+            }
+
+        };
+    </script>
+</body>
+</html>

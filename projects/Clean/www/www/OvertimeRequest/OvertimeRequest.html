@@ -1,0 +1,222 @@
+﻿<!DOCTYPE html>
+
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="utf-8" />
+    <title>Empty Offline HTML page</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="initial-scale=1, user-scalable=no" />
+    <script src="..\Common\JSBridge.js"></script>
+    <script src="..\Common\pe_GlobalCommonFunctions.js"></script>
+    <script src="..\Common\jquery-3.3.1.min.js"></script>
+    <script src="..\Common\popper.min.js"></script>
+    <script src="..\Common\bootstrap.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="..\Common\bootstrap.min.css">
+</head>
+<body onload="OvertimeRequest.OnLoad();">
+    
+    <div class="container mt-1">
+        <button id="btnSendToApproval" class="btn btn-primary btn-block" onclick="OvertimeRequest.OnClick_BtnSendToApprovalHandler();">Send for Approval</button>
+    </div>
+    
+    <br/>
+    <label id="logLabel"></label>
+    <script>
+        var OvertimeRequest = OvertimeRequest || {
+            Enums: {
+                OvertimeRequestType:
+                {
+                    ReportingOverTime: 100000000,
+                    UsingOverTime: 100000001,
+                },
+
+                ApprovalStatus:
+                {
+                    ForApproval: 100000000,
+                    Approved: 100000001,
+                    Disapproved: 100000002,
+                    Cancelled: 100000003, 
+                },
+
+                DetailName:
+                {
+                    General:"General"
+                }
+            },
+
+            OnClick_BtnSendToApprovalHandler: function ()
+            {
+                MobileCRM.UI.EntityForm.requestObject(
+                        function (entityForm) {
+                            
+                            try {
+
+                                LLP.SetExecutionContext(entityForm);
+                                if (OvertimeRequest.Validate(entityForm)) {
+                                    // pokud je vyplneno vse co pozaduji muzeme provest save
+                                    LLP.Common.Attribute_SetValue(OvertimeRequest.Enums.DetailName.General, "pe_approvalstatus", OvertimeRequest.Enums.ApprovalStatus.ForApproval);
+                                    MobileCRM.UI.EntityForm.save();
+                                }
+                                else {
+                                    MobileCRM.bridge.alert("Please enter mandatory values ​​before 'Send To Approval'");
+                                }
+                                
+                            } catch (e) {
+                                LLP.LOG.Error(LLP.Enums.Module.OvertimeRequest, "OnClick_BtnSendToApprovalHandler", e);
+                            }
+                        },
+                        function (errorMessage) {
+                            LLP.LOG.Error(LLP.Enums.Module.OvertimeRequest, "OnClick_btnSendToApprovalHandler :", errorMessage);
+                        }
+                    );
+            },
+
+            EnableSendToApprovalBtn: function()
+            {
+                try {
+                    var approvalStatusValue = LLP.Common.Attribute_GetValue(OvertimeRequest.Enums.DetailName.General, "pe_approvalstatus");
+                    if (approvalStatusValue==-1) {
+                        document.getElementById("btnSendToApproval").disabled = false;
+                    }
+                    else {
+                        document.getElementById("btnSendToApproval").disabled = true;
+                    }
+                } catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.OvertimeRequest, "EnableSendToApprovalBtn :", e);
+                }
+            },
+
+            Validate: function (entityForm)
+            {
+                try {
+
+                    if (LLP.Common.IsNullOrEmpty(LLP.Common.Attribute_GetValue(OvertimeRequest.Enums.DetailName.General, "pe_hours"))) {
+                        return false;
+                    }
+
+                    if (LLP.Common.IsNullOrEmpty(LLP.Common.Attribute_GetValue(OvertimeRequest.Enums.DetailName.General, "pe_minutes"))) {
+                        return false;
+                    }
+
+                    var pe_TotalOverTimeValue = LLP.Common.Attribute_GetValue(OvertimeRequest.Enums.DetailName.General, "pe_overtimerequesttype");
+                    if (pe_TotalOverTimeValue == OvertimeRequest.Enums.OvertimeRequestType.ReportingOverTime) {
+                        if (LLP.Common.IsNullOrEmpty(LLP.Common.Attribute_GetValue(OvertimeRequest.Enums.DetailName.General, "pe_month"))) {
+                            return false;
+                        }
+                        if (LLP.Common.IsNullOrEmpty(LLP.Common.Attribute_GetValue(OvertimeRequest.Enums.DetailName.General, "pe_reasonforovertime"))) {
+                            return false;
+                        }
+                    }
+                    else {
+
+                        if (LLP.Common.IsNullOrEmpty(LLP.Common.Attribute_GetValue(OvertimeRequest.Enums.DetailName.General, "pe_plannedovertimereceiptdate"))) {
+                            return false;
+                        }
+                        //if (LLP.Common.IsNullOrEmpty(LLP.Common.Attribute_GetValue(OvertimeRequest.Enums.DetailName.General, "pe_overtimeforsaturday"))) {
+                        //    return false;
+                        //}
+                    }    
+                    return true;
+                } catch (e) {
+
+                    LLP.LOG.Error(LLP.Enums.Module.OvertimeRequest, LLP.Enums.Module.OvertimeRequest, "Validate: ", e);
+                    return false;
+                }
+            },
+
+            OnChange_OvertimeRequestType: function (entityForm) {
+                try {
+                    
+                    LLP.SetExecutionContext(entityForm);
+                    
+                    LLP.Common.Attribute_Visible(OvertimeRequest.Enums.DetailName.General, "pe_overtimerequesttype");
+                    LLP.Common.Attribute_Disabled(OvertimeRequest.Enums.DetailName.General, "pe_overtimerequesttype");
+                    
+                    LLP.Common.Attribute_Required(OvertimeRequest.Enums.DetailName.General, "pe_hours");
+                    LLP.Common.Attribute_Required(OvertimeRequest.Enums.DetailName.General, "pe_minutes");
+
+                    var pe_TotalOverTimeValue = LLP.Common.Attribute_GetValue(OvertimeRequest.Enums.DetailName.General, "pe_overtimerequesttype");
+
+                    if (pe_TotalOverTimeValue == OvertimeRequest.Enums.OvertimeRequestType.ReportingOverTime) {
+                        LLP.Common.Attribute_Visible(OvertimeRequest.Enums.DetailName.General, "pe_month");
+                        LLP.Common.Attribute_Visible(OvertimeRequest.Enums.DetailName.General, "pe_reasonforovertime");
+                        LLP.Common.Attribute_RequiredWithPossibleNullValue(OvertimeRequest.Enums.DetailName.General, "pe_month", -1);
+                        LLP.Common.Attribute_Required(OvertimeRequest.Enums.DetailName.General, "pe_reasonforovertime");
+                        LLP.Common.Attribute_Invisible(OvertimeRequest.Enums.DetailName.General, "pe_plannedovertimereceiptdate");
+                        LLP.Common.Attribute_Invisible(OvertimeRequest.Enums.DetailName.General, "pe_overtimeforsaturday");
+                        LLP.Common.Attribute_NonRequired(OvertimeRequest.Enums.DetailName.General, "pe_plannedovertimereceiptdate");
+                    }
+                    else {
+                        LLP.Common.Attribute_Invisible(OvertimeRequest.Enums.DetailName.General, "pe_month");
+                        LLP.Common.Attribute_Invisible(OvertimeRequest.Enums.DetailName.General, "pe_reasonforovertime");
+                        LLP.Common.Attribute_NonRequired(OvertimeRequest.Enums.DetailName.General, "pe_month", -1);
+                        LLP.Common.Attribute_NonRequired(OvertimeRequest.Enums.DetailName.General, "pe_reasonforovertime");
+                        LLP.Common.Attribute_Visible(OvertimeRequest.Enums.DetailName.General, "pe_plannedovertimereceiptdate");
+                        LLP.Common.Attribute_Visible(OvertimeRequest.Enums.DetailName.General, "pe_overtimeforsaturday");
+                        LLP.Common.Attribute_Required(OvertimeRequest.Enums.DetailName.General, "pe_plannedovertimereceiptdate");
+                    }
+                    OvertimeRequest.LockForm(entityForm);
+                } catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.OvertimeRequest, "OnChange_OvertimeRequestType", e);
+                }
+            },
+
+            LockForm: function (entityForm)
+            {
+                try {
+
+                    LLP.Common.Attribute_Disabled(OvertimeRequest.Enums.DetailName.General, "pe_approvalstatus");
+
+                    var approvalStatusValue = LLP.Common.Attribute_GetValue(OvertimeRequest.Enums.DetailName.General, "pe_approvalstatus");
+                    if (approvalStatusValue == -1)
+                    {
+                        //Enabled
+                        LLP.Common.Attribute_Enabled(OvertimeRequest.Enums.DetailName.General, "pe_overtimerequesttype");
+                        LLP.Common.Attribute_Enabled(OvertimeRequest.Enums.DetailName.General, "pe_hours");
+                        LLP.Common.Attribute_Enabled(OvertimeRequest.Enums.DetailName.General, "pe_minutes");
+                        LLP.Common.Attribute_Enabled(OvertimeRequest.Enums.DetailName.General, "pe_month");
+                        LLP.Common.Attribute_Enabled(OvertimeRequest.Enums.DetailName.General, "pe_reasonforovertime");
+                        LLP.Common.Attribute_Enabled(OvertimeRequest.Enums.DetailName.General, "pe_overtimeforsaturday");
+                    }
+                    else {
+                        // Disabled
+                        LLP.Common.Attribute_Disabled(OvertimeRequest.Enums.DetailName.General, "pe_overtimerequesttype");
+                        LLP.Common.Attribute_Disabled(OvertimeRequest.Enums.DetailName.General, "pe_hours");
+                        LLP.Common.Attribute_Disabled(OvertimeRequest.Enums.DetailName.General, "pe_minutes");
+                        LLP.Common.Attribute_Disabled(OvertimeRequest.Enums.DetailName.General, "pe_month");
+                        LLP.Common.Attribute_Disabled(OvertimeRequest.Enums.DetailName.General, "pe_reasonforovertime");
+                        LLP.Common.Attribute_Disabled(OvertimeRequest.Enums.DetailName.General, "pe_overtimeforsaturday");
+                    }
+                } catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.OvertimeRequest, "LockForm", e);
+                }
+            },
+
+            // ON LOAD FORM
+            OnLoad: function () {
+                try {
+                    MobileCRM.UI.EntityForm.requestObject(
+                        function (entityForm)
+                        {
+                            LLP.SetExecutionContext(entityForm);
+                            // nastav stav formu.
+                            OvertimeRequest.OnChange_OvertimeRequestType(entityForm);
+
+                            OvertimeRequest.EnableSendToApprovalBtn();
+
+                        },
+                        function (errorMessage) {
+                            LLP.LOG.Error(LLP.Enums.Module.OvertimeRequest, "OnLoad: MobileCRM.UI.EntityForm.requestObject:", errorMessage);
+                        }
+                    );
+                    MobileCRM.UI.EntityForm.onItemChange("pe_overtimerequesttype", OvertimeRequest.OnChange_OvertimeRequestType, true);
+                } catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.OvertimeRequest, "OnLoad", e);
+                }
+            },
+        };
+
+    </script>
+
+</body>
+</html>

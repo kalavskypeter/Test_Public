@@ -1,0 +1,1 @@
+﻿annotation,@Search,@Dashboard,@Map,@activity,@Tourplan,account,contact,lead,opportunity,quote,salesorder,invoice,product,incident,@CallImport,@Setup,@About,pricelevel

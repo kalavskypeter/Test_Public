@@ -1,0 +1,21 @@
+﻿<Scheduler>
+  <Version>1</Version>
+  <Name>Scheduler</Name>
+  <ResourceEntity>systemuser</ResourceEntity>
+  <ActivityName>appointment</ActivityName>
+  <TimeOffsColor>rgba(0,0,0,0)</TimeOffsColor>
+  <TimeOffsBorderColor>rgba(0,0,0,0)</TimeOffsBorderColor>
+  <TimeOffsTextColor>rgba(0,0,0,0)</TimeOffsTextColor>
+  <StartDateField>scheduledstart</StartDateField>
+  <EndDateField>scheduledend</EndDateField>
+  <TravelModeField>outlookownerapptid</TravelModeField>
+  <LookupField>regardingobjectid</LookupField>
+  <ResourceField>ownerid</ResourceField>
+  <StatusField>statuscode</StatusField>
+  <StatusCodeList>
+    <StatusCode name="Free" value="1" taskStatusType="1" color="rgb(39,196,105)" textColor="white" borderColor="rgba(25,126,68,1)" isSecondaryValue="false"/>
+  </StatusCodeList>
+  <WorkEntity>account</WorkEntity>
+  <BorderWidth>2</BorderWidth>
+  <BorderRadius>0</BorderRadius>
+</Scheduler>

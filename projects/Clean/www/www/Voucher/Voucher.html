@@ -1,0 +1,51 @@
+﻿<!DOCTYPE html>
+
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="utf-8" />
+    <title>Empty Offline HTML page</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="initial-scale=1, user-scalable=no" />
+    <script src="..\Common\JSBridge.js"></script>
+    <script src="..\Common\pe_GlobalCommonFunctions.js"></script>
+    <style>
+        label {
+            color: white;
+        }
+    </style>
+</head>
+<body>
+
+
+    <label id="logLabel"></label>
+    <script>
+
+        var Voucher = Voucher || {
+            
+            Enums: {
+                // Detail view display name
+                DisplayName: {
+                    General: "General"
+                },
+            },
+            OnLoad: function () {
+                try
+                {
+                    MobileCRM.UI.EntityForm.requestObject(function (entityForm) {
+                        LLP.SetExecutionContext(entityForm);
+                        LLP.Common.Attribute_Disabled(Voucher.Enums.DisplayName.General, "pe_campaignid");
+                    });
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Voucher, "OnLoad: ", e);
+                }
+            }
+        }
+
+        window.onload = function () {
+            Voucher.OnLoad();
+        }
+
+    </script>
+</body>
+</html>

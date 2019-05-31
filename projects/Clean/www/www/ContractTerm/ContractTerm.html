@@ -1,0 +1,145 @@
+﻿<!DOCTYPE html>
+
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="utf-8" />
+    <title>Empty Offline HTML page</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="initial-scale=1, user-scalable=no" />
+    <script src="..\Common\JSBridge.js"></script>
+    <script src="..\Common\pe_GlobalCommonFunctions.js"></script>
+    <style>
+        label {
+            color: white;
+        }
+    </style>
+</head>
+<body>
+
+
+    <label id="logLabel"></label>
+    <script>
+       
+        var ContractTerm = ContractTerm || {
+            
+            Enums: {
+                // Detail view display name
+                DisplayName: {
+                    General: "General"
+                },
+                FieldType: {
+                    Number: 100000000,
+                    ReadOnly: 100000001,
+                    Percent: 100000002
+                },
+                ContractStatusCode: {
+                    Draft: 100000000
+                }
+            },
+
+           
+            ShowFields: function (entityForm) {
+                try
+                {
+                    LLP.SetExecutionContext(entityForm);
+
+
+                    if (entityForm == null || entityForm.entity == null || entityForm.entity.properties == null || entityForm.entity.properties.pe_termid == null
+                        || entityForm.entity.properties.pe_termid.id == null)
+                    {
+                        ContractTerm.SetVisible(ContractTerm.Enums.FieldType.ReadOnly);
+                        return;
+                    }
+                    
+                    MobileCRM.DynamicEntity.loadById(entityForm.entity.properties.pe_termid.entityName, entityForm.entity.properties.pe_termid.id,
+                        function (entity)
+                        {
+                            if (LLP.Common.IsNullOrEmpty(entity.properties.pe_fieldtype)) {
+                                ContractTerm.SetVisible(ContractTerm.Enums.FieldType.ReadOnly);
+                            }
+                            else {
+                                ContractTerm.SetVisible(entity.properties.pe_fieldtype);
+                            }
+                        },
+                        function (errorMessage)
+                        {
+                            LLP.LOG.Error(LLP.Enums.Module.ContractTerm, "OnLoad -> MobileCRM.Reference.loadById:", errorMessage);
+                        },
+                        null);
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.ContractTerm, "ShowFields: ", e);
+                }
+            },
+
+            SetVisible: function (fieldsType)
+            {
+                try {
+                    MobileCRM.UI.EntityForm.requestObject(
+                        function (entityForm)
+                        {
+                            LLP.SetExecutionContext(entityForm);
+                            switch (fieldsType) {
+                                case ContractTerm.Enums.FieldType.Number:
+                                    LLP.Common.Attribute_Invisible(ContractTerm.Enums.DisplayName.General, "pe_percent");
+                                    LLP.Common.Attribute_Visible(ContractTerm.Enums.DisplayName.General, "pe_number");
+                                    break;
+                                case ContractTerm.Enums.FieldType.Percent:
+                                    LLP.Common.Attribute_Visible(ContractTerm.Enums.DisplayName.General, "pe_percent");
+                                    LLP.Common.Attribute_Invisible(ContractTerm.Enums.DisplayName.General, "pe_number");
+                                    break;
+                                case ContractTerm.Enums.FieldType.ReadOnly:
+                                default:
+                                    LLP.Common.Attribute_Invisible(ContractTerm.Enums.DisplayName.General, "pe_percent");
+                                    LLP.Common.Attribute_Invisible(ContractTerm.Enums.DisplayName.General, "pe_number");
+                                    break;
+                            }
+                        }
+                    );
+                } catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.ContractTerm, "SetVisible: ", e);
+                }
+            },
+            OnLoad: function () {
+                try
+                {
+                    MobileCRM.UI.EntityForm.requestObject(function (entityForm) {
+                        LLP.SetExecutionContext(entityForm);
+                        ContractTerm.ShowFields(entityForm);
+                        var contract = LLP.Common.GetAttributeValue(entityForm.entity, "pe_contractid");
+
+                        LLP.Fetch.IsAttributeValue(contract,
+                                                     "statuscode",
+                                                     ContractTerm.Enums.ContractStatusCode.Draft,
+                                                     function (isSet) {
+
+                                                         MobileCRM.UI.EntityForm.requestObject(function (entityForm) {
+                                                             LLP.SetExecutionContext(entityForm);
+                                                             if (isSet) {
+                                                                 LLP.Form.Enabled(true);
+                                                             }
+                                                             else {
+                                                                 LLP.Form.Disabled(true);
+                                                             }
+                                                         },
+                                                         function (error) {
+                                                             LLP.LOG.Error(LLP.Enums.Module.ProductExchangeIssuedProduct, "OnLoad -> LLP.Fetch.IsAttributeValue -> callback -> MobileCRM.UI.EntityForm.requestObject", e);
+                                                         }, null);
+
+                                                     });
+
+                    });
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.ContractTerm, "OnLoad: ", e);
+                }
+            }
+        }
+
+        window.onload = function () {
+            ContractTerm.OnLoad();
+        }
+
+    </script>
+</body>
+</html>

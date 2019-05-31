@@ -1,0 +1,783 @@
+﻿<!DOCTYPE html>
+
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="utf-8" />
+    <title>Empty Offline HTML page</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="initial-scale=1, user-scalable=no" />
+    <script src="..\Common\JSBridge.js"></script>
+    <script src="..\Common\pe_GlobalCommonFunctions.js"></script>
+    <script src="..\Common\jquery-3.3.1.min.js"></script>
+    <script src="..\Common\popper.min.js"></script>
+    <script src="..\Common\bootstrap.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="..\Common\bootstrap.min.css">
+
+</head>
+<body>
+    <div class="container mt-1">
+        <div class="row">
+            <div class="col"><button class="btn btn-primary btn-block" id="btnCompleted" onclick="TableSurvey.Save(true);">Completed</button></div>
+        </div>
+        <div><p></p></div>
+        <div class="row">
+            <div class="col"><button class="btn btn-primary btn-block" id="btnSave" onclick="TableSurvey.Save(false);">Save</button></div>
+        </div>
+        <div><p></p></div>
+        <div class="row">
+            <div class="col"><button class="btn btn-primary btn-block" id="btnClose" onclick="MobileCRM.bridge.closeForm();">Close</button></div>
+        </div>
+    </div>
+    
+    <br />
+    <div id="tableQuestionDiv"></div>
+    <label id="logLabel"></label>
+    <script>
+       
+
+
+        var TableSurvey = TableSurvey || {
+            Enums: {
+                DetailName:
+                {
+                    General: "General",
+                    TableName: "questiontable55"
+                }
+            },
+
+            CreateTable: function (tableData, disabled)
+            {
+                try {
+                    var columnsCount = 0;
+                    var body = document.getElementById('tableQuestionDiv');
+
+                    var tableHTML = document.createElement('table');
+                    tableHTML.id = TableSurvey.Enums.DetailName.TableName;
+                    tableHTML.style.width = '100%';
+                    tableHTML.setAttribute('class', 'table table-bordered');
+                    tableHTML.tableData = tableData;
+                    var tableBodyHTML = document.createElement('tbody');
+                    tableData.rows.sort(TableSurvey.SortRowIndex)
+                    for (var indexRow = 0; indexRow < tableData.rows.length; indexRow++) {
+
+                        var rowHTML = document.createElement('tr');
+                        var rowData = tableData.rows[indexRow];
+                        rowData.Columns.sort(TableSurvey.SortColumnIndex);
+
+                        for (var indexColumn = 0; indexColumn < rowData.Columns.length; indexColumn++) {
+                            columnsCount++;
+                            var columnHTMLLiterar = 'td';
+                            if (indexRow == 0 || indexColumn == 0) {
+                                columnHTMLLiterar = 'th';
+                            }
+
+                            var columnHTML = document.createElement(columnHTMLLiterar);
+                            var columnData = rowData.Columns[indexColumn];
+
+                            switch (columnData.InputType) {
+                                case TableSurvey.eInputType.Label:
+                                    TableSurvey.CreateLabel(columnHTML, columnData.UniqueName, columnData.LabelText);
+                                    break;
+                                case TableSurvey.eInputType.CheckBox:
+                                    TableSurvey.CreateCheckBox(columnHTML, columnData.UniqueName, columnData.LabelText, columnData.Answer, columnData.Required, disabled);
+                                    break;
+                                case TableSurvey.eInputType.ComboBox:
+                                    TableSurvey.CreateComboBox(columnHTML, columnData.UniqueName, columnData.LabelText, columnData.ValueText, columnData.Answer, columnData.Required, disabled);
+                                    break;
+                                case TableSurvey.eInputType.TextBox:
+                                    TableSurvey.CreateTextBox(columnHTML, columnData.UniqueName, columnData.LabelText, columnData.ValueText, columnData.Answer, columnData.Required, disabled);
+                                    break;
+                                default:
+                            }
+                            rowHTML.appendChild(columnHTML);
+                        }
+                        tableBodyHTML.appendChild(rowHTML);
+                    }
+                    tableHTML.appendChild(tableBodyHTML);
+                    body.appendChild(tableHTML);
+
+                    return columnsCount;
+                } catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.TableSurvey, "TableSurvey.LoadTableData", e);
+                }
+            },
+
+            SortColumnIndex: function (a, b)
+            {
+                if (a.ColumnIndex < b.ColumnIndex) {
+                    return -1;
+                }
+                if (a.ColumnIndex > b.ColumnIndex) {
+                    return 1;
+                }
+                return 0;
+            },
+
+            SortRowIndex: function (a, b)
+            {
+                if (a.RowIndex < b.RowIndex) {
+                    return -1;
+                }
+                if (a.RowIndex > b.RowIndex) {
+                    return 1;
+                }
+                return 0;
+            },
+
+            eInputType:
+                {
+                    Label: 1,
+                    TextBox: 2,
+                    CheckBox: 3,
+                    ComboBox: 4,
+                },
+            CreateRow: function (rowIndex)
+            {
+                this.RowIndex = rowIndex;
+                this.Columns = new Array();
+            },
+
+            CreateColumn: function (uniqueName, inputType, labeltext, valueText, columnIndex, name, required, answer,id)
+            {
+                this.UniqueName = uniqueName;
+                this.InputType = inputType;
+                this.Name = name;
+
+                if (LLP.Common.IsNullOrEmpty(labeltext)) {
+                    this.LabelText = "";
+                }
+                else {
+                    this.LabelText = labeltext;
+                }
+
+                if (LLP.Common.IsNullOrEmpty(valueText)) {
+                    this.ValueText = "";
+                }
+                else {
+                    this.ValueText = valueText;
+                }
+                this.ColumnIndex = columnIndex;
+
+                this.Answer = answer;
+
+                this.Required = required;
+
+                this.Id = id;
+            },
+
+            AddColumnDataToRow: function(table,rowIndex,column)
+            {
+                var row;
+
+                for (var i = 0; i < table.rows.length; i++) {
+                    if (table.rows[i].RowIndex == rowIndex)
+                    {
+                        row = table.rows[i];
+                        break;
+                    }
+                }
+
+                if (row == null)
+                {
+                    row = new TableSurvey.CreateRow(rowIndex);
+                    table.rows.push(row);
+                }
+                row.Columns.push(column);
+
+                return table;
+                
+
+            },
+
+            CreateCheckBox: function (parentElement, UniqueName, labelText, answerValue, required, disabled)
+            {
+                var chk = document.createElement('input');
+                chk.setAttribute('type', 'checkbox');
+                chk.setAttribute('class', 'custom-control-input');
+                if (disabled) {
+                    chk.setAttribute('disabled', 'disabled');
+                }
+                chk.id = UniqueName;
+                if (!LLP.Common.IsNullOrEmpty(answerValue)) {
+                    if (answerValue == 'true') {
+                        chk.checked = true;
+                    }
+                    else {
+                        chk.checked = false;
+                    }
+                }
+
+                var label = document.createElement('label');
+                label.appendChild(document.createTextNode(labelText));
+                label.id = "label" + UniqueName;
+                label.setAttribute('class', 'custom-control-label text-danger');
+                if (required && !disabled) {
+                    label.setAttribute('class', 'custom-control-label text-danger');
+                }
+                else {
+                    label.setAttribute('class', 'custom-control-label');
+                }
+
+
+                label.setAttribute('for', UniqueName);
+
+                var containerRow = document.createElement('div');
+                containerRow.setAttribute('class', 'form-group');
+                
+
+                var containerCheck = document.createElement('div');
+                containerCheck.setAttribute('class', 'custom-control custom-checkbox');
+                containerCheck.appendChild(chk);
+                containerCheck.appendChild(label);
+                containerRow.appendChild(containerCheck);
+                parentElement.appendChild(containerRow);
+
+            },
+
+            CreateTextBox: function (parentElement, UniqueName, labelText, valueText, answerValue, required,disabled)
+            {
+                var textBox = document.createElement('input');
+                textBox.setAttribute('type', 'text');
+                textBox.setAttribute('id', UniqueName);
+                textBox.setAttribute('value', valueText);
+                textBox.setAttribute('class', 'form-control');
+
+                
+                if (disabled) {
+                    textBox.setAttribute('disabled', 'disabled');
+                }
+                
+                textBox.id = UniqueName;
+
+                if (!LLP.Common.IsNullOrEmpty(answerValue))
+                {
+                    textBox.value = answerValue;
+                }
+
+                var label = document.createElement('label');
+                label.appendChild(document.createTextNode(labelText));
+                label.id = "label" + UniqueName;
+                if (required && !disabled) {
+                    label.setAttribute('class', 'col-sm-2 col-form-label text-danger');
+                }
+                else {
+                    label.setAttribute('class', 'col-sm-2 col-form-label');
+                }
+
+                var containerRow = document.createElement('div');
+                containerRow.setAttribute('class', 'form-group col-sm-10');
+                containerRow.appendChild(label);
+                containerRow.appendChild(textBox);
+
+                parentElement.appendChild(containerRow);
+
+                
+            },
+
+            CreateComboBox: function (parentElement, UniqueName, labelText, arrayOptionsText, answerValue,required, disabled)
+            {
+                var list = document.createElement('select');
+                list.setAttribute('class', 'form-control')
+                list.id = UniqueName;
+                if (disabled) {
+                    list.setAttribute('disabled', 'disabled');
+                }
+
+                var arrayOptions = arrayOptionsText.split(",");
+                for (var i = 0; i < arrayOptions.length; i++) {
+                    var option = document.createElement("option");
+                    option.value = arrayOptions[i];
+                    option.text = arrayOptions[i];
+                    list.appendChild(option);
+                }
+
+                if (!LLP.Common.IsNullOrEmpty(answerValue)) {
+                    list.value = answerValue;
+                }
+
+                var label = document.createElement('label');
+                label.id = 'label' + UniqueName;
+                label.appendChild(document.createTextNode(labelText));
+
+                if (required && !disabled) {
+                    label.setAttribute('class', 'col-sm-2 col-form-label text-danger');
+                }
+                else {
+                    label.setAttribute('class', 'col-sm-2 col-form-label');
+                }
+
+                var container = document.createElement('div');
+                container.setAttribute('class', 'form-group');
+                container.appendChild(label);
+                container.appendChild(list);
+                parentElement.appendChild(container);
+            },
+
+            CreateLabel: function (parentElement, UniqueName, labelText)
+            {
+                var label = document.createElement('label');
+                label.id = UniqueName;
+                label.appendChild(document.createTextNode(labelText));
+
+                var container = document.createElement('div');
+                container.appendChild(label);
+                parentElement.appendChild(container);
+
+            },
+
+            LoadTableData: function (tablSurveyId, isTemplate, accountObject, pe_visitactivity, pe_internalnumber,readonly)
+            {
+                try {
+                    // ziskam zaznamy z tabulky 
+                    var xml =
+                       '<fetch >\
+                            <entity name="pe_tablesurveyquestion" >  \
+                            <attribute name="pe_answer" /> \
+                            <attribute name="pe_name" /> \
+                            <attribute name="pe_inputtype" />  \
+                            <attribute name="pe_rowindex" />  \
+                            <attribute name="pe_columnindex" />  \
+                            <attribute name="pe_labeltext" />  \
+                            <attribute name="pe_uniquename" />  \
+                            <attribute name="pe_valuetext" />  \
+                            <attribute name="pe_required" />  \
+                            <attribute name="pe_tablesurveyquestionid" /> \
+                            <filter> ' + 
+                        '      <condition attribute="pe_tablesurveyid" operator="eq" value="' + tablSurveyId+ '" />  \
+                            </filter>  \
+                          </entity> \
+                        </fetch>';
+
+
+                    MobileCRM.FetchXml.Fetch.deserializeFromXml(xml, function (fetch)
+                    {
+                        
+                        fetch.execute("DynamicEntities", function (tableSurveyQuestions)
+                        {
+                            var table = {
+                                rows: [],
+                                AccountObject: accountObject,
+                                VisitActivityObject: pe_visitactivity
+                            };
+
+                            if (tableSurveyQuestions.length > 0) {
+                                for (var i = 0; i < tableSurveyQuestions.length; i++) {
+                                    var ques= tableSurveyQuestions[i];
+                                    var columnData = new TableSurvey.CreateColumn(
+                                        ques.properties.pe_uniquename,
+                                        ques.properties.pe_inputtype,
+                                        ques.properties.pe_labeltext,
+                                        ques.properties.pe_valuetext,
+                                        ques.properties.pe_columnindex,
+                                        ques.properties.pe_name,
+                                        ques.properties.pe_required,
+                                        ques.properties.pe_answer,
+                                        ques.id
+                                        );
+                                    table = TableSurvey.AddColumnDataToRow( table, ques.properties.pe_rowindex, columnData);
+                                }
+
+                                var columnsCount = TableSurvey.CreateTable(table, readonly);
+                                if (isTemplate && !LLP.Common.IsNullOrEmpty(accountObject) && !LLP.Common.IsNullOrEmpty(pe_internalnumber)) {
+                                    TableSurvey.LoadPreviousQuestion(accountObject, pe_internalnumber, columnsCount);
+                                }
+
+                            }
+                        },
+
+                          function (errorMessage)
+                          {
+                              MobileCRM.bridge.alert(errorMessage);
+                          }
+
+                        );
+                    },
+
+                    function (errorMessage)
+                    {
+                        MobileCRM.bridge.alert(errorMessage);
+                    }
+                    );
+
+                } catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.TableSurvey, "TableSurvey.LoadTableData", e);
+                }
+            },
+
+            LoadPreviousQuestion: function (accountObject, pe_internalnumber, recordCount)
+            {
+                try {
+                    // ziskam predesle odpovedi z tabulky 
+                    var xml =
+                       '<fetch >\
+                            <entity name="pe_tablesurvey" >  \
+                                    <attribute name="pe_name" /> \
+                                    <filter> \
+                                        <condition attribute="pe_accountid" operator="eq" value="' + accountObject.id + '" /> \
+                                        <condition attribute="pe_internalnumber" operator="eq" value="' + pe_internalnumber + '" /> \
+                                        <condition attribute="pe_completed" operator="eq" value="1" /> \
+                                    </filter> \
+                                <order attribute="createdon" descending="true" /> \
+                                <link-entity name="pe_tablesurveyquestion" from="pe_tablesurveyid" to="pe_tablesurveyid" > \
+                                    <attribute name="pe_answer" /> \
+                                    <attribute name="pe_inputtype" />  \
+                                    <attribute name="pe_uniquename" />  \
+                                </link-entity> \
+                          </entity> \
+                        </fetch>';
+
+                    MobileCRM.FetchXml.Fetch.deserializeFromXml(xml, function (fetch)
+                    {
+                        fetch.count = recordCount;
+                        fetch.execute("DynamicEntities", function (tableSurveyQuestions)
+                        {
+                            if (tableSurveyQuestions.length > 0) {
+                                for (var i = 0; i < tableSurveyQuestions.length; i++) {
+                                    var ques = tableSurveyQuestions[i];
+                                    if (ques.properties["CL0.pe_inputtype"] != 1) {
+                                        TableSurvey.SetValueToHtmlControl(ques.properties["CL0.pe_uniquename"], ques.properties["CL0.pe_answer"]);
+                                    }
+                                }
+                            }
+                        },
+
+                          function (errorMessage)
+                          {
+                              MobileCRM.bridge.alert(errorMessage);
+                          }
+
+                        );
+                    },
+
+                   function (errorMessage)
+                   {
+                       MobileCRM.bridge.alert(errorMessage);
+                   }
+                   );
+
+
+
+                } catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.TableSurvey, "TableSurvey.OnLoad: MobileCRM.UI.EntityForm.:", e);
+                }
+            },
+
+            SetValueToHtmlControl: function (uniqueName, value)
+            {
+                try {
+                    var htmlControls = document.getElementById(uniqueName);
+
+                    if (!LLP.Common.IsNullOrEmpty(htmlControls)) {
+                        if (htmlControls.type == "checkbox") {
+                            if (value=="true") {
+                                htmlControls.checked = true;
+                            }
+                            else {
+                                htmlControls.checked = false;
+                            }
+                        }
+                        else {
+                            htmlControls.value = value;
+                        }
+                    }
+                } catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.TableSurvey, "TableSurvey.SetValueToHtmlControl", e);
+                }
+            },
+
+            Save: function (completed) {
+                try {
+                    // pokud je to completed je potreba zkontrolovat zda je pole povinne
+
+                    MobileCRM.UI.EntityForm.requestObject(
+                      function (entityForm)
+                      {
+                          // pokud je completed tak jiz neni mozno ukladat
+                          if (entityForm.entity.properties.pe_completed)
+                          {
+                              MobileCRM.UI.MessageBox("Upozornení", "Survey is completed!");
+                              return;
+                          }
+
+                          var HTMLTable = document.getElementById(TableSurvey.Enums.DetailName.TableName);
+                          var tableData = HTMLTable.tableData;
+                          var pe_accountid = tableData.AccountObject;
+                          var pe_VisitActivity = tableData.VisitActivityObject;
+                          // vytvoreni nove odpovedi
+                          var pe_tablesurvey = new MobileCRM.DynamicEntity.createNew("pe_tablesurvey");
+
+                          if (entityForm.entity.properties.pe_istemplate == false) {
+                              // pokud neni template tak probiha editace zaznamu
+                              pe_tablesurvey.id = entityForm.entity.id;
+                              pe_tablesurvey.isNew = false;
+                          }
+                          else {
+                              LLP.Common.SetAttributeValue(pe_tablesurvey, "pe_name", entityForm.entity.properties.pe_name + " Answer " + pe_accountid.primaryName);
+                          }
+                          LLP.Common.SetAttributeValue(pe_tablesurvey, "pe_istemplate", false);
+                          LLP.Common.SetAttributeValue(pe_tablesurvey, "pe_accountid", pe_accountid);
+                          LLP.Common.SetAttributeValue(pe_tablesurvey, "pe_internalnumber", entityForm.entity.properties.pe_internalnumber);
+                          if(!LLP.Common.IsNullOrEmpty(pe_VisitActivity))
+                          {
+                              LLP.Common.SetAttributeValue(pe_tablesurvey, "pe_visitactivityid", pe_VisitActivity);
+                          }
+
+                          if (completed)
+                          {
+                              // je potreba zkontrolovat required fields.
+                              if (TableSurvey.ValidatetableColumns() == false)
+                              {
+                                  return;
+                              }
+                             
+                              LLP.Common.SetAttributeValue(pe_tablesurvey, "pe_completed", true);
+                          }
+
+                          // ulozeni odpovedi
+                          pe_tablesurvey.save(
+                              function (err)
+                              {
+                                  if (err) {
+                                      LLP.LOG.Error(LLP.Enums.Module.TableSurvey, "Error Save pe_tablesurvey -> callback: ", err);
+                                  }
+                                  else {
+                                      // pokud se podarilo ulozit hlavicku tak ulozime radky
+                                      var newId = this.id;
+                                      var HTMLTable = document.getElementById(TableSurvey.Enums.DetailName.TableName);
+                                      var tableData = HTMLTable.tableData;
+
+                                      for (var indexRow = 0; indexRow < tableData.rows.length; indexRow++) {
+                                          var row = tableData.rows[indexRow];
+                                          for (var indexColumn = 0; indexColumn < row.Columns.length; indexColumn++) {
+                                              var columnData = row.Columns[indexColumn];
+
+                                              var pe_tableSurveyQuestion = TableSurvey.CreateTableSurveyQuestions(columnData);
+                                              
+                                              if (entityForm.entity.properties.pe_istemplate == false) {
+                                                  // je to editace puvodniho zaznamu
+                                                  pe_tableSurveyQuestion.id = columnData.Id;
+                                                  pe_tableSurveyQuestion.isNew = false;
+                                              }
+
+
+                                              var pe_tableSurveyQuestionRef = new MobileCRM.Reference("pe_tablesurvey", this.id, null);
+
+                                              LLP.Common.SetAttributeValue(pe_tableSurveyQuestion, "pe_tablesurveyid", pe_tableSurveyQuestionRef);
+                                              LLP.Common.SetAttributeValue(pe_tableSurveyQuestion, "pe_rowindex", row.RowIndex);
+                                              pe_tableSurveyQuestion.save(
+                                                  function (err)
+                                                  {
+                                                      if (err) {
+                                                          LLP.LOG.Error(LLP.Enums.Module.TableSurvey, "Error Save pe_tablesurveyquestion -> callback: ", err);
+                                                      }
+                                                  }
+                                              );
+                                          }
+                                      }
+                                  }
+
+                                  if (completed && !LLP.Common.IsNullOrEmpty(pe_VisitActivity)) {
+                                      var pe_visitactivity = new MobileCRM.DynamicEntity.createNew("pe_visitactivity");
+                                      pe_visitactivity.isNew = false;
+                                      pe_visitactivity.id = pe_VisitActivity.id;
+                                      LLP.Common.SetAttributeValue(pe_visitactivity, "pe_lastrun", new Date());
+                                      LLP.Common.SetAttributeValue(pe_visitactivity, "statuscode", 100000000); // completed
+                                      pe_visitactivity.save(
+                                           function (err)
+                                           {
+                                               if (err) {
+                                                   LLP.LOG.Error(LLP.Enums.Module.TableSurvey, "Error Save pe_visitactivity -> callback: ", err);
+                                               }
+                                           }
+                                      );
+                                  }
+
+                                  MobileCRM.bridge.closeForm();
+                              }
+                          );
+
+
+                      },
+                      function (errorMessage)
+                      {
+                          LLP.LOG.Error(LLP.Enums.Module.TableSurvey, "TableSurvey.OnLoad: MobileCRM.UI.EntityForm.:", errorMessage);
+                      }
+                    );
+
+                } catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.TableSurvey, "TableSurvey.Save", e);
+                }
+                
+            },
+
+            ValidatetableColumns: function()
+            {
+                try {
+                    var HTMLTable = document.getElementById(TableSurvey.Enums.DetailName.TableName);
+                    var tableData = HTMLTable.tableData;
+                    var returnValue = true;
+                    for (var indexRow = 0; indexRow < tableData.rows.length; indexRow++) {
+                        var row = tableData.rows[indexRow];
+                        for (var indexColumn = 0; indexColumn < row.Columns.length; indexColumn++) {
+                            var columnData = row.Columns[indexColumn];
+
+                            if (columnData.Required) {
+                                var answerValue = "";
+                                var htmlControls = document.getElementById(columnData.UniqueName);
+                                if (htmlControls.type == "checkbox") {
+                                    continue;
+                                }
+                                else {
+                                    answerValue = htmlControls.value;
+                                }
+
+                                if (LLP.Common.IsNullOrEmpty(answerValue)) {
+                                    htmlControls.classList.add("bg-danger");
+                                    htmlControls.classList.add("text-white");
+                                    returnValue = false;
+                                }
+                                else {
+                                    htmlControls.classList.remove('bg-danger');
+                                    htmlControls.classList.remove('text-white');
+                                }
+                            }
+                        }
+                    }
+
+                    return returnValue;
+
+                } catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.TableSurvey, "TableSurvey.ValidatetableColumns", e);
+                    return false;
+                }
+            },
+
+            CreateTableSurveyQuestions: function(columnData)
+            {
+                try {
+                    var pe_tablesurveyquestion = new MobileCRM.DynamicEntity.createNew("pe_tablesurveyquestion");
+                    LLP.Common.SetAttributeValue(pe_tablesurveyquestion, "pe_name", columnData.Name  + " Answer");
+                    LLP.Common.SetAttributeValue(pe_tablesurveyquestion, "pe_columnindex", columnData.ColumnIndex);
+                    LLP.Common.SetAttributeValue(pe_tablesurveyquestion, "pe_uniquename", columnData.UniqueName);
+                    LLP.Common.SetAttributeValue(pe_tablesurveyquestion, "pe_labeltext", columnData.LabelText);
+                    LLP.Common.SetAttributeValue(pe_tablesurveyquestion, "pe_valuetext", columnData.ValueText);
+                    LLP.Common.SetAttributeValue(pe_tablesurveyquestion, "pe_required", columnData.Required);
+                    LLP.Common.SetAttributeValue(pe_tablesurveyquestion, "pe_inputtype", columnData.InputType);
+                    
+
+
+                    if (columnData.InputType != 1) {
+                        var answerValue = null;
+                        var htmlControls = document.getElementById(columnData.UniqueName);
+
+                        if (!LLP.Common.IsNullOrEmpty(htmlControls)) {
+                            if (htmlControls.type == "checkbox") {
+                                answerValue = htmlControls.checked;
+                            }
+                            else {
+                                answerValue = htmlControls.value;
+                            }
+                            LLP.Common.SetAttributeValue(pe_tablesurveyquestion, "pe_answer", answerValue);
+                        }
+                    }
+                    return pe_tablesurveyquestion;
+
+                } catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.TableSurvey, "TableSurvey.CreateTableSurveyQuestions", e);
+                }
+                
+            
+            },
+
+            DisabledHtmlControl: function(htmlControlId)
+            {
+                try {
+                    var htmlControl = document.getElementById(htmlControlId);
+                    htmlControl.setAttribute('disabled', 'disabled');
+
+                } catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.TableSurvey, "TableSurvey.CreateTableSurveyQuestions", e)
+                }
+            },
+
+            OnLoad: function ()
+            {
+                try {
+                    MobileCRM.UI.EntityForm.requestObject(
+                        function (entityForm)
+                        {
+                            LLP.SetExecutionContext(entityForm);
+                           
+
+                            var pe_internalnumber = entityForm.entity.properties.pe_internalnumber;
+                            var completed = entityForm.entity.properties.pe_completed;
+
+                            if (completed)
+                            {
+                                TableSurvey.DisabledHtmlControl("btnSave");
+                                TableSurvey.DisabledHtmlControl("btnCompleted");
+                            }
+
+
+                            if (entityForm.entity.properties.pe_istemplate) {
+                                // je to template takze budeme zobrazovat novou verzi dotazniku a dotahneme data z predesle odpovedi
+                                // pokud existuje
+                                var accountObject = null;
+                                var pe_VisitActivity = null;
+                                if (LLP.Common.IsNullOrEmpty(entityForm.relationship)) {
+                                    MobileCRM.UI.MessageBox("Warning", "Relationship Account not selected!");
+                                };
+
+                                if (entityForm.relationship.target.entityName == "appointment")
+                                {
+                                    
+                                    if (entityForm.relationship.target.properties.regardingobjectid.entityName == "account") {
+                                         accountObject = entityForm.relationship.target.properties.regardingobjectid;
+                                    }
+                                }
+                                else if (entityForm.relationship.target.entityName == "pe_visitactivity")
+                                {
+                                    accountObject = JSON.parse(entityForm.relationship.intersectProperty);
+
+                                    pe_VisitActivity = entityForm.relationship.target;
+                                }
+
+                                if (LLP.Common.IsNullOrEmpty(accountObject))
+                                {
+
+                                    MobileCRM.UI.MessageBox("Warning", "Account not selected!");
+                                    return;
+                                }
+
+
+                                TableSurvey.LoadTableData(entityForm.entity.id, true, accountObject, pe_VisitActivity, pe_internalnumber, completed);
+                            }
+                            else {
+
+                                // je to zobrazeni jiz dokonceneho dotazniku pouze zobrazime data a neumoznime editaci.
+                                var accountObject = entityForm.entity.properties.pe_accountid;
+                                var pe_VisitActivity = entityForm.entity.properties.pe_visitactivityid;
+                                TableSurvey.LoadTableData(entityForm.entity.id, false, accountObject, pe_VisitActivity, pe_internalnumber, completed);
+                            }
+                        },
+                        function (errorMessage)
+                        {
+                            LLP.LOG.Error(LLP.Enums.Module.TableSurvey, "TableSurvey.OnLoad: MobileCRM.UI.EntityForm.:", errorMessage);
+                        }
+                    );
+                } catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.TableSurvey, "TableSurvey.OnLoad", e);
+                }
+            },
+        }
+
+        window.onload = function ()
+        {
+            TableSurvey.OnLoad();
+        }
+
+
+    </script>
+</body>
+
+</html>

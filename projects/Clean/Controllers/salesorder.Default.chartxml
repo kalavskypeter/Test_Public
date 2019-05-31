@@ -1,0 +1,27 @@
+﻿<EntityChart>
+  <Name>Default</Name>
+  <Kind>Donut</Kind>
+  <DateGrouping>Year</DateGrouping>
+  <LimitCount>3</LimitCount>
+  <Axis>createdon</Axis>
+  <MinValue>
+    <Color>#FF0000FF</Color>
+  </MinValue>
+  <MaxValue>
+    <Color>#FF0000FF</Color>
+  </MaxValue>
+  <TargetValue>
+    <Color>#FF0000FF</Color>
+  </TargetValue>
+  <SerializedBindings/>
+  <Attributes>
+    <EntityName>salesorder</EntityName>
+    <CamelCase>salesorder</CamelCase>
+  </Attributes>
+  <Series>
+    <Series>
+      <Attribute>createdon</Attribute>
+      <Color>#FF0000FF</Color>
+    </Series>
+  </Series>
+</EntityChart>

@@ -1,0 +1,173 @@
+﻿<!DOCTYPE html>
+
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="utf-8" />
+    <title>Empty Offline HTML page</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="initial-scale=1, user-scalable=no" />
+    <script src="..\Common\JSBridge.js"></script>
+    <script src="..\Common\pe_GlobalCommonFunctions.js"></script>
+</head>
+<body>
+    <script>
+
+        //Task 5224 |
+        //----------
+        //Resco
+        //--------
+        //entita pe_orderproduct
+        //--------
+
+        //1) zmena nazvu souboru:
+        //ProductOrder -> ProductOrderAllProducts
+        //OrderProductRow.html -> OrderProductAllProductsRow.html
+        //pridan novy soubor: 
+        //OrderProductPriceCheck.html
+        //OrderProductPriceCheckRow.html
+
+        //2) na entite pe_orderproduct, formular Order Product - Price Check nastavit:
+        //#readonly:
+        //pe_pricechecklastprice
+        //pe_productid
+
+        //#povinne pole + editovatelne: pe_currentprice
+        //pokud: 
+        //pe_pricecheck == true
+        //pe_orderid.pe_pricecheckstatusreason == 100 000 002 (Active)
+        //pe_quantityinstock > 0
+
+        //#NEpovinne pole + editovatelne: pe_currentprice
+        //pe_pricecheck == true
+        //pe_quantityinstock > 0
+
+        //#readonly: pe_currentprice
+        //- pokud horni podminky nejsou splneny
+
+        //3) pripojen dalsi HTML na view: Order Products – Price Check
+        //- je potreba zaridit aby pole pe_currentprice
+        //bylo editovatelne pouze pri splneni podminek viz bod 2, jen rozdeleno na 2 html
+
+        var OrderProductPriceCheck = OrderProductPriceCheck || {
+            Enums: {
+                // Detail view display name
+                DetailViewName: {
+                    General: "General"
+                },
+                PriceCheckStatusReason: {
+                    Draft: 100000000,
+                    Completed: 100000001,
+                    Active: 100000002,
+                    Inactive: 100000003,
+                }
+            },
+            ReadOnlyFields: ["pe_pricechecklastprice", "pe_productid"],
+            CheckFields: function () {
+                try {
+                    var failedFields = null;
+                    var delimiter = "";
+
+                    for (var i = 0; i < OrderProductPriceCheck.ReadOnlyFields.length; i++) {
+                        try {
+                            LLP.Common.Attribute_Disabled(OrderProductPriceCheck.Enums.DetailViewName.General, OrderProductPriceCheck.ReadOnlyFields[i]);
+                        }
+                        catch (e) {
+                            failedFields += delimiter + OrderProductPriceCheck.ReadOnlyFields[i];
+
+                            if (LLP.Common.IsNullOrEmpty(delimiter)) {
+                                delimiter = ", ";
+                            }
+                        }
+                    }
+
+                    if (!LLP.Common.IsNullOrEmpty(failedFields)) {
+                        LLP.LOG.Error(LLP.Enums.Module.OrderProductPriceCheck, "CheckFields", "Failed to disable this fields: " + failedFields);
+                    }
+
+                    var pe_orderid = LLP.Common.Attribute_GetValue(OrderProductPriceCheck.Enums.DetailViewName.General, "pe_orderid");
+                    MobileCRM.DynamicEntity.loadById(pe_orderid.entityName, pe_orderid.id, function (order) {
+                        MobileCRM.UI.EntityForm.requestObject(function (entityForm) {
+                            LLP.SetExecutionContext(entityForm);
+
+                            var pe_pricecheckstatusreason = LLP.Common.GetAttributeValue(order, "pe_pricecheckstatusreason");
+                            var pe_pricecheck = LLP.Common.GetAttributeValue(entityForm.entity, "pe_pricecheck");
+                            var pe_quantityinstock = LLP.Common.GetAttributeValue(entityForm.entity, "pe_quantityinstock");
+
+                            var required = false;
+                            var disabled = true;
+
+                            switch(pe_pricecheckstatusreason)
+                            {
+                                case OrderProductPriceCheck.Enums.PriceCheckStatusReason.Active:
+                                    if (pe_pricecheck && pe_quantityinstock > 0) {
+                                        required = true;
+                                        disabled = false;
+                                    }
+                                    break;
+                                default:
+                                    if (pe_pricecheck && pe_quantityinstock > 0) {
+                                        required = false;
+                                        disabled = false;
+                                    }
+                                    break;
+                            }
+
+                            LLP.Common.Attribute_IsRequired(OrderProductPriceCheck.Enums.DetailViewName.General, "pe_currentprice", required);
+                            LLP.Common.Attribute_IsDisabled(OrderProductPriceCheck.Enums.DetailViewName.General, "pe_currentprice", disabled);
+                        },
+                        function (error) {
+                            LLP.LOG.Error(LLP.Enums.Module.OrderProductPriceCheck, "CheckFields -> MobileCRM.UI.EntityForm.requestObject pe_orderid", error);
+                        }, null);
+                    },
+                    function (error) {
+                        LLP.LOG.Error(LLP.Enums.Module.OrderProductPriceCheck, "CheckFields", error);
+                    }, null);
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.OrderProductPriceCheck, "CheckFields", e);
+                }
+            },
+            OnChange_PriceCheck: function (entityForm) {
+                try {
+                    LLP.SetExecutionContext(entityForm);
+                    OrderProductPriceCheck.CheckFields();
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.OrderProductPriceCheck, "OnChange_CurrentPrice", e);
+                }
+            },
+            OnChange_QuantityInStock: function (entityForm) {
+                try {
+                    LLP.SetExecutionContext(entityForm);
+                    OrderProductPriceCheck.CheckFields();
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.OrderProductPriceCheck, "OnChange_NumberOfUnits", e);
+                }
+            },
+            OnLoad: function () {
+                try {
+                    MobileCRM.UI.EntityForm.onItemChange("pe_pricecheck", OrderProductPriceCheck.OnChange_PriceCheck, true, null);
+                    MobileCRM.UI.EntityForm.onItemChange("pe_quantityinstock", OrderProductPriceCheck.OnChange_QuantityInStock, true, null);
+
+                    MobileCRM.UI.EntityForm.requestObject(function (entityForm) {
+                        LLP.SetExecutionContext(entityForm);
+                        OrderProductPriceCheck.CheckFields();
+                    },
+                    function (error) {
+                        LLP.LOG.Error(LLP.Enums.Module.OrderProductPriceCheck, "OnLoad -> MobileCRM.UI.EntityForm.requestObject", error);
+                    }, null);
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.OrderProductPriceCheck, "OnLoad", e);
+                }
+            }
+        }
+
+        window.onload = function () {
+            OrderProductPriceCheck.OnLoad();
+        }
+
+    </script>
+</body>
+</html>

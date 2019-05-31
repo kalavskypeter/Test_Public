@@ -1,0 +1,414 @@
+﻿<!DOCTYPE html>
+
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="utf-8" />
+    <title>Empty Offline HTML page</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="initial-scale=1, user-scalable=no" />
+    <script src="..\Common\JSBridge.js"></script>
+    <script src="..\Common\pe_GlobalCommonFunctions.js"></script>
+    <script src="..\Common\jquery-3.3.1.min.js"></script>
+    <script src="..\Common\popper.min.js"></script>
+    <script src="..\Common\bootstrap.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="..\Common\bootstrap.min.css">
+</head>
+<body>
+    <div class="container mt-1">
+        <div class="row">
+            <div class="col"><button id="btnSendOpenCompletedState" class="btn btn-primary btn-block" onclick="WorkOrder.OnClick_btnSendOpenCompletedStateHandler();">Completed</button></div>
+        </div>
+        <div class="row mt-2">
+            <div class="col"><button id="btnCopyPosm" class="btn btn-primary btn-block" onclick="WorkOrder.OnClick_CopyPosm();">Copy</button></div>
+        </div>
+    </div>
+    
+    <br />
+    <label id="logLabel"></label>
+    <script>
+
+        //Task 5156
+        //----------
+        //RESCO
+        //V pripade, ze se zvoli Work Order Type = C2C, je potreba na formulari zobrazit a zpovinnit pole pe_transfertoaccountid
+        //********************************************************************************************************************
+        // task 5116 |
+        //-----------
+        //Resco
+        //Vytvorit tlacitko na POSM objednavce (Work Order, kde work order type = POSM). 
+        //Po kliknti na tlacitko se vytvori kopie objednavky s vazbou na tu puvodni s Work Order Type =POSM Complaint (přes lookup msdyn_ParentWorkOrder).
+        //Do objednavky se zkopiruji vsechny radky (Work Order Products) puvodni objednavky. 
+
+        //PZA:
+        //msdyn_workorder.msdyn_workordertype lookup na msdyn_workordertype
+        //msdyn_workordertype.pe_workordersubtype - POSM 100000001
+
+        //msdyn_workorderproduct.msdyn_workorder lookup na msdyn_workorder
+        //********************************************************************************************************************
+        // Task 5156 |
+        //-----------
+        //RESCO
+        //V pripade, ze se zvoli Work Order Type = C2C, je potreba na formulari zobrazit a zpovinnit pole pe_transfertoaccountid
+
+        //PZA 13.3.2019:
+        //po dohodě s PDA se do entity msdyn_workordertype přidá pick list pe_workordersubtype s hodnotami:
+        //C2C = 100000000
+        //POSM = 100000001
+
+        //Podmínka viz. výše se bude řídit tímto polem. To platí i pro task 5116
+
+        //********************************************************************************************************************
+        //Task 5234 |
+        //----------
+        //Po vybrani hodnoty v poli msdyn_reportedbycontact vyplnit hodnotu emailaddress1 z vybraneho kontaktu do pole pe_deliveryemail
+        //********************************************************************************************************************
+        //Task 5365 |
+        //----------
+        //potřeboval bych u těchto entit napočítávat po stisknutí tlačítka completed počet řádků.
+        //tato hodnota se určitě přenese do CRM, ale nemusí se už přenést všechny řádky..
+        //- techto entit muze byt vice, princip a nazev pole bude vzdy stejny, tak se to da nejak treba usnadnit?
+
+        //    entita: salesorder
+        //    pole: pe_countofrelatedrows
+
+        //    entita: msdyn_workorder
+        //    pole: pe_countofrelatedrows
+
+        var WorkOrder = WorkOrder || {
+            Enums: {
+
+                Msdyn_SystemStatus:
+                {
+                    OpenUnscheduled: 690970000,
+                    OpenScheduled: 690970001,
+                    OpenInProgress: 690970002,
+                    OpenCompleted: 690970003, // tento stav je vse zamceno
+                    ClosedPosted: 690970004,
+                    ClosedCanceled: 690970005,
+                },
+                DetailName:
+                {
+                    General: "General"
+                },
+                WorkOrderSubtype: {
+                    C2C: 100000000,
+                    POSM: 100000001
+                },
+                AssetType: {
+                    NonSerialized: 100000000,
+                    Serialized: 100000001
+                }
+            },
+            SetToComplete: false,
+            OriginalWorkOrderSubType: null,
+            OnClick_btnSendOpenCompletedStateHandler: function ()
+            {
+                MobileCRM.UI.EntityForm.requestObject(
+                        function (entityForm)
+                        {
+
+                            try {
+
+                                LLP.SetExecutionContext(entityForm);
+                                WorkOrder.SetToComplete = true;
+
+                                if (!entityForm.isDirty) {
+                                    LLP.Common.Attribute_SetValue(WorkOrder.Enums.DetailName.General, "msdyn_systemstatus", WorkOrder.Enums.Msdyn_SystemStatus.OpenCompleted);
+                                }
+
+                                MobileCRM.UI.EntityForm.save();
+
+                                //if (WorkOrder.OnSave(entityForm)) {
+                                //    // pokud je vyplneno vse co pozaduji muzeme provest save
+                                    
+                                //}
+                                //else {
+                                //    MobileCRM.bridge.alert("Please enter mandatory values ​​before 'Confirmed'");
+                                //}
+
+                            } catch (e) {
+                                LLP.LOG.Error(LLP.Enums.Module.WorkOrder, "OnClick_btnSendOpenCompletedStateHandler", e);
+                            }
+                        },
+                        function (errorMessage)
+                        {
+                            LLP.LOG.Error(LLP.Enums.Module.WorkOrder, "OnClick_btnSendOpenCompletedStateHandler :", errorMessage);
+                        }
+                    );
+            },
+            OnClick_CopyPosm: function() {
+                try {
+                    MobileCRM.UI.EntityForm.requestObject(function (entityForm) {
+                        MobileCRM.UI.FormManager.showNewDialog(entityForm.entity.entityName,
+                            new MobileCRM.Relationship(entityForm.entity.entityName, new MobileCRM.Reference(entityForm.entity.entityName, entityForm.entity.id, entityForm.entity.primaryName)),
+                            {
+                                "@initialize": LLP.Form.GetInitDialogFieldsWithValues(["msdyn_name", "msdyn_serviceaccount", "pe_transfertoaccountid", "msdyn_reportedbycontact", "msdyn_workordertype", "msdyn_systemstatus", "pe_shippingconditionid"], entityForm.entity)
+                            });
+                        MobileCRM.UI.EntityForm.closeWithoutSaving();
+                    },
+                    function (errorMessage) {
+                        LLP.LOG.Error(LLP.Enums.Module.WorkOrder, "OnClick_CopyPosm -> requestObject:", errorMessage);
+                    }, null);
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.WorkOrder, "OnClick_CopyPosm :", e);
+                }
+            },
+            OnChange_WorkOrderType: function(entityForm) {
+                LLP.SetExecutionContext(entityForm);
+                WorkOrder.CheckWorkOrderType();
+            },
+            Enable_btnSendOpenCompletedState: function ()
+            {
+                try {
+                    var msdyn_SystemStatus = LLP.Common.Attribute_GetValue(WorkOrder.Enums.DetailName.General, "msdyn_systemstatus");
+                    let disabled = msdyn_SystemStatus == WorkOrder.Enums.Msdyn_SystemStatus.OpenCompleted;
+                    LLP.HtmlControl.SetDisabled("btnSendOpenCompletedState", disabled);
+                } catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.WorkOrder, "Enable_btnSendOpenCompletedState ", e);
+                }
+            },
+            CheckWorkOrderType: function(isOnLoad) {
+                try {
+                    var msdyn_workordertype = LLP.Common.Attribute_GetValue(WorkOrder.Enums.DetailName.General, "msdyn_workordertype");
+                    if (msdyn_workordertype) {
+                        MobileCRM.DynamicEntity.loadById("msdyn_workordertype", msdyn_workordertype.id, function (result) {
+                            MobileCRM.UI.EntityForm.requestObject(function (entityForm) {
+                                LLP.SetExecutionContext(entityForm);
+
+                                var btnCopyPosmHidden = true;
+                                var pe_workordersubtype = LLP.Common.GetAttributeValue(result, "pe_workordersubtype");
+                                
+                                if (isOnLoad) {
+                                    WorkOrder.OriginalWorkOrderSubType = pe_workordersubtype;
+                                }
+
+                                if (!LLP.Form.IsCreate() && pe_workordersubtype == WorkOrder.Enums.WorkOrderSubtype.POSM && WorkOrder.OriginalWorkOrderSubType == WorkOrder.Enums.WorkOrderSubtype.POSM) {
+                                    btnCopyPosmHidden = false;
+                                }
+
+                                var pe_transfertoaccountidVisibleAndRequired = false;
+
+                                if (pe_workordersubtype == WorkOrder.Enums.WorkOrderSubtype.C2C) {
+                                    pe_transfertoaccountidVisibleAndRequired = true;
+                                }
+                                else {
+                                    LLP.Common.Attribute_SetValue(WorkOrder.Enums.DetailName.General, "pe_transfertoaccountid", null);
+                                }
+
+                                LLP.Common.Attribute_IsRequired(WorkOrder.Enums.DetailName.General, "pe_transfertoaccountid", pe_transfertoaccountidVisibleAndRequired);
+                                LLP.Common.Attribute_Visibility(WorkOrder.Enums.DetailName.General, "pe_transfertoaccountid", pe_transfertoaccountidVisibleAndRequired);
+
+                                document.getElementById("btnCopyPosm").hidden = btnCopyPosmHidden;
+                            });
+                        },
+                        function (error) {
+                            LLP.LOG.Error(LLP.Enums.Module.WorkOrder, "CheckWorkOrderType:", error);
+                        }, null);
+                    }
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.WorkOrder, "CheckWorkOrderType:", e);
+                }
+            },
+            GetWorkOrderProducts: function(workorderid, callback) {
+                try {
+                    var xml = '<fetch>\
+		                        <entity name="msdyn_workorderproduct">\
+                                <attribute name="msdyn_workorderproductid" />\
+		                        <filter type="and">\
+			                        <condition attribute="msdyn_workorder" operator="eq" value="' + workorderid + '" />\
+		                        </filter>\
+		                        </entity>\
+	                        </fetch>';
+
+                    MobileCRM.FetchXml.Fetch.deserializeFromXml(xml, function (fetch) {
+                        fetch.execute("DynamicEntities", function (result) {
+                            callback(result);
+                        }, MobileCRM.bridge.alert);
+                    }, MobileCRM.bridge.alert);
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.WorkOrder, "GetWorkOrderProducts:", e);
+                }
+            },
+            OnChange_ReportedByContact: function(entityForm) {
+                try {
+                    LLP.SetExecutionContext(entityForm);
+                    var msdyn_reportedbycontact = LLP.Common.Attribute_GetValue(WorkOrder.Enums.DetailName.General, "msdyn_reportedbycontact");
+                    if (!msdyn_reportedbycontact) {
+                        LLP.Common.Attribute_SetValue(WorkOrder.Enums.DetailName.General, "pe_deliveryemail", null);
+                        return;
+                    }
+
+                    MobileCRM.DynamicEntity.loadById("contact", msdyn_reportedbycontact.id, function (result) {
+                        MobileCRM.UI.EntityForm.requestObject(function (ef) {
+                            LLP.SetExecutionContext(ef);
+                            var email = LLP.Common.GetAttributeValue(result, "emailaddress1");
+                            LLP.Common.Attribute_SetValue(WorkOrder.Enums.DetailName.General, "pe_deliveryemail", !email ? null : email);
+                        },
+                        function (error) {
+                            LLP.LOG.Error(LLP.Enums.Module.WorkOrder, "OnChange_ReportedByContact -> MobileCRM.UI.EntityForm.requestObject failed:", error);
+                        }, null);
+                    },
+                    function (error) {
+                        LLP.LOG.Error(LLP.Enums.Module.WorkOrder, "OnChange_ReportedByContact -> " + msdyn_reportedbycontact.primaryName + " contact loading failed (" + msdyn_reportedbycontact.id + "):", error);
+                    }, null);
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.WorkOrder, "OnChange_ReportedByContact:", e);
+                }
+            },
+            CalculateWorkOrderLines: function(entityForm, saveHandler, callback) {
+                try {
+                    if (!WorkOrder.SetToComplete) {
+                        callback([], saveHandler);
+                    }
+                    else {
+                        LLP.Fetch.GetChildRows("msdyn_workorderproduct", "msdyn_workorder", entityForm.entity.id, ["msdyn_workorderproductid"], saveHandler, callback);
+                    }
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.WorkOrder, "CalculateWorkOrderLines:", e);
+                }
+            },
+            OnSave: function (entityForm)
+            {
+                try {
+                    
+                    var saveHandler = entityForm.suspendSave();
+                    LLP.SetExecutionContext(entityForm);
+
+                    WorkOrder.CalculateWorkOrderLines(entityForm, saveHandler, function (children, saveHandler) {
+
+                        MobileCRM.UI.EntityForm.requestObject(function (ef) {
+                            LLP.SetExecutionContext(ef);
+                            var msdyn_workordertype = LLP.Common.Attribute_GetValue(WorkOrder.Enums.DetailName.General, "msdyn_workordertype");
+                            
+                            if (WorkOrder.SetToComplete) {
+                                LLP.Common.SetAttributeValue(ef.entity, "pe_countofrelatedrows", children ? children.length : 0);
+                            }
+
+                            if (LLP.Form.IsCreate() && ef.relationship && ef.relationship.sourceProperty == "msdyn_workorder") {
+                                LLP.Common.SetAttributeValue(ef.entity, "msdyn_parentworkorder", new MobileCRM.Reference(ef.relationship.target.entityName, ef.relationship.target.id, ef.relationship.target.primaryName))
+                            }
+
+                            if (msdyn_workordertype.primaryName == "Installation") {
+                                var msdyn_serviceaccount = LLP.Common.Attribute_GetValue(WorkOrder.Enums.DetailName.General, "msdyn_serviceaccount");
+
+                                MobileCRM.DynamicEntity.loadById(msdyn_serviceaccount.entityName, msdyn_serviceaccount.id,
+                                    function (entity) {
+                                        if (LLP.Common.IsNullOrEmpty(entity.properties.pe_bailmentcontractsigned)) {
+                                            saveHandler.resumeSave("Service Account '" + entity.primaryName + "' has an 'Bailment Contract Signed' property that is empty!");
+                                        }
+                                        else if (LLP.Common.IsNullOrEmpty(entity.properties.pe_idsap)) {
+                                            saveHandler.resumeSave("Service Account '" + entity.primaryName + "' has an 'Customer Account Number' property that is empty!");
+                                        }
+                                        else {
+                                            saveHandler.resumeSave();
+                                        }
+                                    },
+                                    function (errorMessage) {
+                                        LLP.LOG.Error(LLP.Enums.Module.WorkOrder, "OnLoad -> MobileCRM.Reference.loadById:", errorMessage);
+                                    },
+                                    null);
+                            }
+                            else {
+                                saveHandler.resumeSave();
+                            }
+                        });
+                    });
+                } catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.WorkOrder, "OnSave", e);
+                }
+            },
+            OnPostSave: function (entityForm) {
+                try {
+                    
+                    if (LLP.Form.IsCreate() && entityForm.relationship.sourceProperty == "msdyn_workorder") {
+                        var postSaveHandler = entityForm.suspendPostSave();
+                        var copyExcept = ["createdon", "modifiedon", "ownerid", "propertyChanged"];
+                        
+                        WorkOrder.GetWorkOrderProducts(entityForm.relationship.target.id, function (workOrderProducts) {
+
+                            var results = [];
+
+                            for (var i = 0; i < workOrderProducts.length; i++) {
+                                MobileCRM.DynamicEntity.loadById(workOrderProducts[i].entityName, workOrderProducts[i].id, function (wop) {
+                                    var workOrderProduct = new MobileCRM.DynamicEntity(wop.entityName);
+                                    var names = Object.getOwnPropertyNames(wop.properties);
+                                    for (var j = 0; j < names.length; j++) {
+                                        if (copyExcept.indexOf(names[j]) < 0 && names[j][0] != "_") {
+                                            LLP.Common.SetAttributeValue(workOrderProduct, names[j], LLP.Common.GetAttributeValue(wop, names[j]));
+                                        }
+                                    }
+
+                                    LLP.Common.SetAttributeValue(workOrderProduct, "msdyn_workorder", new MobileCRM.Reference(entityForm.entity.entityName, entityForm.entity.id, entityForm.entity.primaryName));
+
+                                    workOrderProduct.save(function (err) {
+                                        if (err) {
+                                            LLP.LOG.Error(LLP.Enums.Module.WorkOrder, "OnPostSave -> saving msdyn_workorderproduct failed", err);
+                                            results.push(false);
+                                        }
+                                        else {
+                                            results.push(true);
+                                        }
+
+                                        if (results.length == workOrderProducts.length) {
+                                            postSaveHandler.resumePostSave();
+                                        }
+                                    });
+                                },
+                                function (error) {
+                                    LLP.LOG.Error(LLP.Enums.Module.WorkOrder, "OnPostSave -> MobileCRM.DynamicEntity.loadById msdyn_workorderproduct failed", error);
+                                }, null);
+                            }
+                        });
+                    }
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.WorkOrder, "OnPostSave", e);
+                }
+            },
+            OnLoad: function ()
+            {
+                try {
+
+                    MobileCRM.UI.EntityForm.onItemChange("msdyn_workordertype", WorkOrder.OnChange_WorkOrderType, true, null);
+                    MobileCRM.UI.EntityForm.onItemChange("msdyn_reportedbycontact", WorkOrder.OnChange_ReportedByContact, true, null);
+
+                    MobileCRM.UI.EntityForm.requestObject(
+                        function (entityForm)
+                        {
+                            LLP.SetExecutionContext(entityForm);
+                            entityForm.setTabVisibility("Actions", !LLP.Form.IsCreate());
+
+                            var msdyn_SystemStatus = entityForm.entity.properties["msdyn_systemstatus"];
+                            
+                            if (msdyn_SystemStatus == WorkOrder.Enums.Msdyn_SystemStatus.OpenCompleted) {
+                                LLP.Form.Disabled();
+                            }
+                            else {
+                                LLP.Form.Enabled();
+                            }
+                            WorkOrder.Enable_btnSendOpenCompletedState();
+
+                            MobileCRM.UI.EntityForm.onSave(WorkOrder.OnSave, true, null);
+                            MobileCRM.UI.EntityForm.onPostSave(WorkOrder.OnPostSave, true, null);
+                            WorkOrder.CheckWorkOrderType(true);
+                        },
+                        function (errorMessage)
+                        {
+                            LLP.LOG.Error(LLP.Enums.Module.WorkOrder, "WorkOrder.OnLoad: MobileCRM.UI.EntityForm.:", errorMessage);
+                        }
+                    );
+                } catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.WorkOrder, "WorkOrder.OnLoad", e);
+                }
+            },
+        }
+
+        window.onload = WorkOrder.OnLoad;
+    </script>
+</body>
+</html>
