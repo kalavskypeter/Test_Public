@@ -1,4 +1,4 @@
 ﻿#GPS;on
-#LogSync;off
+#LogSync;on
 #LogAppState;off
 #TrackGpsChanges;on;600;500

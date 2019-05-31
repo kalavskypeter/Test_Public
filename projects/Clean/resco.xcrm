@@ -48,6 +48,20 @@
         </index>
       </indexes>
     </entity>
+    <entity schema="accountleads">
+      <properties>
+        <property schema="accountid"/>
+        <property schema="leadid"/>
+      </properties>
+      <indexes>
+        <index schema="idx_accountleads" issystem="true">
+          <fields>
+            <field schema="leadid"/>
+            <field schema="accountid"/>
+          </fields>
+        </index>
+      </indexes>
+    </entity>
     <entity schema="activity">
       <properties>
         <property schema="activityid"/>
@@ -91,6 +105,23 @@
         <property schema="ownerid"/>
         <property schema="subject"/>
       </properties>
+      <indexes>
+        <index schema="idx_activitymimeattachment_objectid" issystem="true">
+          <fields>
+            <field schema="objectid"/>
+          </fields>
+        </index>
+        <index schema="idx_activitymimeattachment_ownerid" issystem="true">
+          <fields>
+            <field schema="ownerid"/>
+          </fields>
+        </index>
+        <index schema="idx_activitymimeattachment_filename" issystem="true">
+          <fields>
+            <field schema="filename"/>
+          </fields>
+        </index>
+      </indexes>
     </entity>
     <entity schema="activityparty">
       <properties>
@@ -336,6 +367,11 @@
         <index schema="idx_email_scheduledend" issystem="true">
           <fields>
             <field schema="scheduledend"/>
+          </fields>
+        </index>
+        <index schema="idx_email_resco_emailid" issystem="true">
+          <fields>
+            <field schema="resco_emailid"/>
           </fields>
         </index>
       </indexes>
@@ -837,14 +873,9 @@
         <property schema="transactioncurrencyid"/>
       </properties>
       <indexes>
-        <index schema="idx_quote_pricelevelid" issystem="true">
+        <index schema="idx_quote_customerid" issystem="true">
           <fields>
-            <field schema="pricelevelid"/>
-          </fields>
-        </index>
-        <index schema="idx_quote_ownerid" issystem="true">
-          <fields>
-            <field schema="ownerid"/>
+            <field schema="customerid"/>
           </fields>
         </index>
         <index schema="idx_quote_transactioncurrencyid" issystem="true">
@@ -852,9 +883,14 @@
             <field schema="transactioncurrencyid"/>
           </fields>
         </index>
-        <index schema="idx_quote_customerid" issystem="true">
+        <index schema="idx_quote_ownerid" issystem="true">
           <fields>
-            <field schema="customerid"/>
+            <field schema="ownerid"/>
+          </fields>
+        </index>
+        <index schema="idx_quote_pricelevelid" issystem="true">
+          <fields>
+            <field schema="pricelevelid"/>
           </fields>
         </index>
         <index schema="idx_quote_name" issystem="true">
@@ -930,6 +966,28 @@
         <property schema="resco_name"/>
         <property schema="resco_text"/>
       </properties>
+      <indexes>
+        <index schema="idx_resco_chatcomment_resco_chatpostid" issystem="true">
+          <fields>
+            <field schema="resco_chatpostid"/>
+          </fields>
+        </index>
+        <index schema="idx_resco_chatcomment_resco_chatuserid" issystem="true">
+          <fields>
+            <field schema="resco_chatuserid"/>
+          </fields>
+        </index>
+        <index schema="idx_resco_chatcomment_ownerid" issystem="true">
+          <fields>
+            <field schema="ownerid"/>
+          </fields>
+        </index>
+        <index schema="idx_resco_chatcomment_resco_name" issystem="true">
+          <fields>
+            <field schema="resco_name"/>
+          </fields>
+        </index>
+      </indexes>
     </entity>
     <entity schema="resco_chatpost">
       <properties>
@@ -944,12 +1002,42 @@
         <property schema="resco_name"/>
         <property schema="resco_text"/>
       </properties>
+      <indexes>
+        <index schema="idx_resco_chatpost_resco_chatuserid" issystem="true">
+          <fields>
+            <field schema="resco_chatuserid"/>
+          </fields>
+        </index>
+        <index schema="idx_resco_chatpost_resco_chattopicid" issystem="true">
+          <fields>
+            <field schema="resco_chattopicid"/>
+          </fields>
+        </index>
+        <index schema="idx_resco_chatpost_ownerid" issystem="true">
+          <fields>
+            <field schema="ownerid"/>
+          </fields>
+        </index>
+        <index schema="idx_resco_chatpost_resco_name" issystem="true">
+          <fields>
+            <field schema="resco_name"/>
+          </fields>
+        </index>
+      </indexes>
     </entity>
     <entity schema="resco_chatpost_chatuser">
       <properties>
         <property schema="resco_chatpostid"/>
         <property schema="resco_chatuserid"/>
       </properties>
+      <indexes>
+        <index schema="idx_resco_chatpost_chatuser" issystem="true">
+          <fields>
+            <field schema="resco_chatpostid"/>
+            <field schema="resco_chatuserid"/>
+          </fields>
+        </index>
+      </indexes>
     </entity>
     <entity schema="resco_chattopic">
       <properties>
@@ -961,12 +1049,32 @@
         <property schema="resco_regardingobjectentity"/>
         <property schema="resco_regardingobjectid"/>
       </properties>
+      <indexes>
+        <index schema="idx_resco_chattopic_ownerid" issystem="true">
+          <fields>
+            <field schema="ownerid"/>
+          </fields>
+        </index>
+        <index schema="idx_resco_chattopic_resco_name" issystem="true">
+          <fields>
+            <field schema="resco_name"/>
+          </fields>
+        </index>
+      </indexes>
     </entity>
     <entity schema="resco_chattopic_chatuser">
       <properties>
         <property schema="resco_chattopicid"/>
         <property schema="resco_chatuserid"/>
       </properties>
+      <indexes>
+        <index schema="idx_resco_chattopic_chatuser" issystem="true">
+          <fields>
+            <field schema="resco_chattopicid"/>
+            <field schema="resco_chatuserid"/>
+          </fields>
+        </index>
+      </indexes>
     </entity>
     <entity schema="resco_chatuser">
       <properties>
@@ -978,6 +1086,18 @@
         <property schema="resco_userentity"/>
         <property schema="resco_userid"/>
       </properties>
+      <indexes>
+        <index schema="idx_resco_chatuser_ownerid" issystem="true">
+          <fields>
+            <field schema="ownerid"/>
+          </fields>
+        </index>
+        <index schema="idx_resco_chatuser_resco_name" issystem="true">
+          <fields>
+            <field schema="resco_name"/>
+          </fields>
+        </index>
+      </indexes>
     </entity>
     <entity schema="resco_contact">
       <properties>
@@ -999,6 +1119,13 @@
         <property schema="resco_source"/>
         <property schema="telephone1"/>
       </properties>
+      <indexes>
+        <index schema="idx_resco_contact_fullname" issystem="true">
+          <fields>
+            <field schema="fullname"/>
+          </fields>
+        </index>
+      </indexes>
     </entity>
     <entity schema="resco_devicecontrol">
       <properties>
@@ -1124,6 +1251,18 @@
         <property schema="resco_folderitemid"/>
         <property schema="resco_itemid"/>
       </properties>
+      <indexes>
+        <index schema="idx_resco_folderitem_resco_folderid" issystem="true">
+          <fields>
+            <field schema="resco_folderid"/>
+          </fields>
+        </index>
+        <index schema="idx_resco_folderitem_resco_itemid" issystem="true">
+          <fields>
+            <field schema="resco_itemid"/>
+          </fields>
+        </index>
+      </indexes>
     </entity>
     <entity schema="resco_mobileaudit">
       <properties>
@@ -1256,19 +1395,9 @@
         <property schema="transactioncurrencyid"/>
       </properties>
       <indexes>
-        <index schema="idx_salesorder_pricelevelid" issystem="true">
+        <index schema="idx_salesorder_quoteid" issystem="true">
           <fields>
-            <field schema="pricelevelid"/>
-          </fields>
-        </index>
-        <index schema="idx_salesorder_ownerid" issystem="true">
-          <fields>
-            <field schema="ownerid"/>
-          </fields>
-        </index>
-        <index schema="idx_salesorder_transactioncurrencyid" issystem="true">
-          <fields>
-            <field schema="transactioncurrencyid"/>
+            <field schema="quoteid"/>
           </fields>
         </index>
         <index schema="idx_salesorder_customerid" issystem="true">
@@ -1276,9 +1405,19 @@
             <field schema="customerid"/>
           </fields>
         </index>
-        <index schema="idx_salesorder_quoteid" issystem="true">
+        <index schema="idx_salesorder_transactioncurrencyid" issystem="true">
           <fields>
-            <field schema="quoteid"/>
+            <field schema="transactioncurrencyid"/>
+          </fields>
+        </index>
+        <index schema="idx_salesorder_ownerid" issystem="true">
+          <fields>
+            <field schema="ownerid"/>
+          </fields>
+        </index>
+        <index schema="idx_salesorder_pricelevelid" issystem="true">
+          <fields>
+            <field schema="pricelevelid"/>
           </fields>
         </index>
         <index schema="idx_salesorder_name" issystem="true">
@@ -1435,6 +1574,13 @@
         <property schema="modifiedon"/>
         <property schema="systemuserid"/>
       </properties>
+      <indexes>
+        <index schema="idx_systemuser_fullname" issystem="true">
+          <fields>
+            <field schema="fullname"/>
+          </fields>
+        </index>
+      </indexes>
     </entity>
     <entity schema="task">
       <properties>
