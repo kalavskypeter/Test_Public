@@ -1,0 +1,193 @@
+﻿<!DOCTYPE html>
+
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="utf-8" />
+    <title>Empty Offline HTML page</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="initial-scale=1, user-scalable=no" />
+    <script src="..\Common\JSBridge.js"></script>
+    <script src="..\Common\pe_GlobalCommonFunctions.js"></script>
+</head>
+<body>
+    <label id="logLabel"></label>
+    <script>
+
+
+        var pe_visitactivity = null;
+        var pe_accountid = null;
+        var Questionnaire = Questionnaire || {
+            Enums: {
+               DetailName:
+               {
+                   General: "General"
+               }
+            },
+
+            OnSave: function (entityForm) {
+
+                var postSuspend = entityForm.suspendSave();
+
+                if (!LLP.Common.IsNullOrEmpty(entityForm.relationship)) {
+                    if (entityForm.relationship.target.entityName == "appointment") {
+                        if (entityForm.relationship.target.properties.regardingobjectid.entityName == "account") {
+                            entityForm.questionnaire.properties.pe_accountid = entityForm.relationship.target.properties.regardingobjectid;
+
+                        }
+                    }
+                }
+
+                if (!LLP.Common.IsNullOrEmpty(pe_visitactivity))
+                {
+                    entityForm.questionnaire.properties.pe_visitactivityis = new MobileCRM.Reference(pe_visitactivity.entityName, pe_visitactivity.id, pe_visitactivity.primaryName);
+                }
+
+                if (!LLP.Common.IsNullOrEmpty(pe_accountid)) {
+                    entityForm.questionnaire.properties.pe_accountid = new MobileCRM.Reference(pe_accountid.entityName, pe_accountid.id, pe_accountid.primaryName);
+                }
+
+                if (!LLP.Common.IsNullOrEmpty(pe_VisitActivity)) {
+                    var pe_VisitActivity = new MobileCRM.DynamicEntity.createNew("pe_visitactivity");
+                    pe_VisitActivity.isNew = false;
+                    pe_VisitActivity.id = pe_visitactivity.id;
+                    LLP.Common.SetAttributeValue(pe_VisitActivity, "pe_lastrun", new Date());
+                    LLP.Common.SetAttributeValue(pe_VisitActivity, "statuscode", 100000000); // completed
+                    pe_VisitActivity.save(
+                         function (err)
+                         {
+                             if (err) {
+                                 LLP.LOG.Error(LLP.Enums.Module.TableSurvey, "Error Save pe_VisitActivity -> callback: ", err);
+                             }
+                         }
+                    );
+                }
+
+
+                postSuspend.resumeSave();
+            },
+
+            LoadPreviousQuestion: function (entityQForm)
+            {
+                try {
+
+                    if (entityQForm.relationship.target.entityName != "appointment") {
+                        if (entityQForm.relationship.target.properties.regardingobjectid.entityName != "account") {
+                            return;
+                        }
+                    }
+
+                    entityQForm.questionnaire.properties.pe_accountid = entityQForm.relationship.target.properties.regardingobjectid;
+
+                    if (!LLP.Common.IsNullOrEmpty(entityQForm.questionnaire.properties.pe_internalnumber) &&
+                        !LLP.Common.IsNullOrEmpty(entityQForm.questionnaire.properties.pe_accountid))
+                    {
+
+                        // ziskam predchozi zaznam 
+                        var xml =
+                           '<fetch top="1">\
+                                <entity name="resco_questionnaire"> \
+                                     <attribute name="resco_name" /> \
+                                     <attribute name="resco_questionnaireid" /> \
+                                    <filter> \
+                                        <condition attribute="pe_accountid" operator="eq" value="' + entityQForm.questionnaire.properties.pe_accountid.id + '" /> \
+                                        <condition attribute="pe_internalnumber" operator="eq" value="' + entityQForm.questionnaire.properties.pe_internalnumber + '" /> \
+                                        <condition attribute="resco_completionstatus" operator="eq" value="1" /> \
+                                    </filter> \
+                                    <order attribute="createdon" descending="true" /> \
+                                    <link-entity name="resco_question" from="resco_questionnaireid" to="resco_questionnaireid" > \
+                                          <attribute name="resco_value" /> \
+                                          <attribute name="resco_label" /> \
+                                    </link-entity> \
+                                </entity> \
+                            </fetch>';
+
+
+                        MobileCRM.FetchXml.Fetch.deserializeFromXml(xml, function (fetch)
+                        {
+                            fetch.count = entityQForm.questions.length;
+                            fetch.execute("DynamicEntities", function (questionnairies)
+                            {
+                                if (questionnairies.length > 0) {
+
+                                    MobileCRM.UI.QuestionnaireForm.requestObject(function (entityQuestionsForm)
+                                    {
+                                        for (var indexPrevious = 0; indexPrevious < questionnairies.length; indexPrevious++) {
+
+                                            for (var indexForm = 0; indexForm < entityQuestionsForm.questions.length; indexForm++) {
+
+                                                if (questionnairies[indexPrevious].properties['CL0.resco_label'] == entityQuestionsForm.questions[indexForm].label)
+                                                {
+                                                    entityQuestionsForm.questions[indexForm].value = questionnairies[indexPrevious].properties['CL0.resco_value'];
+                                                }
+                                            }
+                                        }
+                                    },
+                                    function (errorMessage)
+                                    {
+                                        MobileCRM.bridge.alert(errorMessage);
+                                    }, null);
+                                }
+                            },
+
+                              function (errorMessage)
+                              {
+                                  MobileCRM.bridge.alert(errorMessage);
+                              }
+
+                            );
+                        },
+
+                        function (errorMessage)
+                        {
+                            MobileCRM.bridge.alert(errorMessage);
+                        }
+                        );
+                    }
+                } catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Questionnaire, "Questionnaire.LoadPreviousQuestion", e);
+                }
+            },
+
+            OnLoad: function ()
+            {
+                try {
+                    MobileCRM.UI.QuestionnaireForm.requestObject(
+                        function (entityForm)
+                        {
+                            LLP.SetExecutionContext(entityForm);
+                            if (entityForm.questionnaire.isNew) {
+                                MobileCRM.UI.QuestionnaireForm.onSave(Questionnaire.OnSave, true, null);
+                                Questionnaire.LoadPreviousQuestion(entityForm);
+
+                                // zavolam predesle okno a ziskam pozadovane parametry
+                                MobileCRM.bridge.raiseGlobalEvent("VisitActivityIDGetSurvey", null);
+
+                            }
+
+
+                            MobileCRM.bridge.onGlobalEvent("VisitActivityIDSetSurvey", function (args)
+                            {  // pro ziskani parametru z predesleho okna
+                                pe_visitactivity = args;
+                                pe_accountid = LLP.Common.GetAttributeValue(pe_visitactivity, "pe_accountid");
+
+                            }, true);
+
+                        },
+                        function (errorMessage)
+                        {
+                            LLP.LOG.Error(LLP.Enums.Module.Questionnaire, "Questionnaire.OnLoad: MobileCRM.UI.EntityForm.:", errorMessage);
+                        }
+                    );
+                } catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Questionnaire, "Questionnaire.OnLoad", e);
+                }
+            },
+        }
+
+        window.onload = function ()
+        {
+            Questionnaire.OnLoad();
+        }
+    </script>
+</body>
+</html>

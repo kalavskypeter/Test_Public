@@ -1,0 +1,64 @@
+﻿<EntityForm xsi:dummy="0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" flexi="0" fleximode="1" fullscreen="0" resize="0" version="2">
+  <IsContactForm>false</IsContactForm>
+  <EntityName>appointment</EntityName>
+  <CamelCase>Appointment</CamelCase>
+  <WorkflowLoad>&lt;?xml version="1.0" ?&gt;&lt;Workflow e="true" isvalid="true" syntaxVersion="11" version="0"&gt;&lt;function e="false"&gt;&lt;var&gt;Shared.test&lt;/var&gt;&lt;func&gt;Assign&lt;/func&gt;&lt;arg&gt;var:Entity.scheduledstart&lt;/arg&gt;&lt;/function&gt;&lt;function e="false"&gt;&lt;var&gt;Shared.test&lt;/var&gt;&lt;func&gt;FormatSpecial&lt;/func&gt;&lt;arg&gt;String:{Entity.scheduledstart:D}&lt;/arg&gt;&lt;/function&gt;&lt;/Workflow&gt;</WorkflowLoad>
+  <SharedVariables>&lt;SharedVariables&gt;&lt;Variables&gt;&lt;SharedVariable usage="OnLoadEnabled"&gt;&lt;Name&gt;test&lt;/Name&gt;&lt;CrmType&gt;String&lt;/CrmType&gt;&lt;/SharedVariable&gt;&lt;/Variables&gt;&lt;/SharedVariables&gt;</SharedVariables>
+  <PrimaryCommands>!defcmd</PrimaryCommands>
+  <SharedVariableNames>
+    <string>test</string>
+  </SharedVariableNames>
+  <ClassBinding/>
+  <EnabledWorkflows>OnLoadEnabled OnChangeEnabled OnSaveEnabled OnExecuteCommand OnCanExecuteCommand</EnabledWorkflows>
+  <SerializedChildrenV2>
+    <FormTab xsi:type="DetailTab">
+      <Name>General</Name>
+      <SerializedChildren>
+        <DetailItem SchemaName="regardingobjectid"/>
+        <DetailItem separator="true" xsi:type="SeparatorDetailItem">
+          <IsConstant>true</IsConstant>
+        </DetailItem>
+        <DetailItem SchemaName="subject"/>
+        <DetailItem SchemaName="location"/>
+        <DetailItem separator="true" xsi:type="SeparatorDetailItem">
+          <IsConstant>true</IsConstant>
+        </DetailItem>
+        <DetailItem SchemaName="scheduledstart"/>
+        <DetailItem SchemaName="scheduledend"/>
+        <DetailItem separator="true" xsi:type="SeparatorDetailItem">
+          <IsConstant>true</IsConstant>
+        </DetailItem>
+        <DetailItem SchemaName="prioritycode"/>
+        <DetailItem SchemaName="statuscode"/>
+        <DetailItem SchemaName="test"/>
+      </SerializedChildren>
+    </FormTab>
+    <FormTab xsi:type="AssociatedTab">
+      <Name>Notes List</Name>
+      <Binding SchemaName="annotation.objectid"/>
+    </FormTab>
+    <FormTab xsi:type="SignatureTab">
+      <Name>Customer's Signature</Name>
+      <NoteSubject>Customer_Signature</NoteSubject>
+      <EntityName>annotation</EntityName>
+      <Commands>4097</Commands>
+    </FormTab>
+    <FormTab xsi:type="SignatureTab">
+      <Name>Customer's Signature</Name>
+      <NoteSubject>customer_signature</NoteSubject>
+      <EntityName>annotation</EntityName>
+      <Commands>4097</Commands>
+    </FormTab>
+    <FormTab xsi:type="DetailTab">
+      <Name>Details</Name>
+      <SerializedChildren>
+        <DetailItem SchemaName="organizer"/>
+        <DetailItem SchemaName="requiredattendees"/>
+      </SerializedChildren>
+    </FormTab>
+    <FormTab xsi:type="AssociatedTab">
+      <Name>Notes List</Name>
+      <Binding SchemaName="annotation.objectid"/>
+    </FormTab>
+  </SerializedChildrenV2>
+</EntityForm>

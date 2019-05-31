@@ -1,0 +1,161 @@
+﻿<!DOCTYPE html>
+
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="utf-8" />
+    <title>Empty Offline HTML page</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="initial-scale=1, user-scalable=no" />
+    <script src="..\Common\JSBridge.js"></script>
+    <script src="..\Common\pe_GlobalCommonFunctions.js"></script>
+    <script src="..\Common\jquery-3.3.1.min.js"></script>
+    <script src="..\Common\popper.min.js"></script>
+    <script src="..\Common\bootstrap.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="..\Common\bootstrap.min.css">
+</head>
+<body>
+
+    <div class="container mt-1">
+        <div class="row">
+            <button id="btnSave" class="btn btn-primary btn-block" onclick="MAServiceOn.OnClick_Save();">Save</button>
+        </div>
+        <div class="row mt-2">
+            <button id="btnCompleted" class="btn btn-primary btn-block" onclick="MAServiceOn.OnClick_Completed();">Completed</button>
+        </div>
+    </div>
+
+
+    <script>
+
+    var MAServiceOn = MAServiceOn || {
+        Enums: {
+            // Detail view display name
+            DisplayViewName: {
+                General: "General"
+            },
+            StatusCode: {
+                Active: 1,
+                Completed: 100000000,
+                Inactive: 2
+            }
+        },
+        SetToCompleted: false,
+        SetEditability: function(entityForm) {
+            try {
+                var disabled = false;
+                if (LLP.Common.GetAttributeValue(entityForm.entity, "statuscode") == MAServiceOn.Enums.StatusCode.Completed) {
+                    LLP.Form.Disabled();
+                    LLP.HtmlControl.SetDisabled("btnSave", true);
+                    LLP.HtmlControl.SetDisabled("btnCompleted", true);
+                }
+            }
+            catch (e) {
+                LLP.LOG.Error(LLP.Enums.Module.MAServiceOn, "SetEditability", e);
+            }
+        },
+        SetCompleted: function (entity) {
+            LLP.Common.SetAttributeValue(entity, "statuscode", MAServiceOn.Enums.StatusCode.Completed);
+        },
+        OnClick_Save: function () {
+            try {
+                MobileCRM.UI.EntityForm.save();
+            }
+            catch (e) {
+                LLP.LOG.Error(LLP.Enums.Module.MAServiceOn, "Save", e);
+            }
+        },
+        OnClick_Completed: function () {
+            try {
+                MobileCRM.UI.EntityForm.requestObject(function(entityForm) {
+                    MAServiceOn.SetToCompleted = true;
+                    if (!entityForm.isDirty) {
+                        MAServiceOn.SetCompleted(entityForm.entity);
+                    }
+                    MobileCRM.UI.EntityForm.save();
+                },
+                function(error) {
+                    LLP.LOG.Error(LLP.Enums.Module.MAServiceOn, "Completed -> MobileCRM.UI.EntityForm.requestObject", error);
+                }, null);
+            }
+            catch (e) {
+                LLP.LOG.Error(LLP.Enums.Module.MAServiceOn, "Completed", e);
+            }
+        },
+        OnLoad: function () {
+            try
+            {
+                MobileCRM.UI.EntityForm.onSave(MAServiceOn.OnSave, true, null);
+                MobileCRM.UI.EntityForm.onPostSave(MAServiceOn.OnPostSave, true, null);
+                MobileCRM.UI.EntityForm.requestObject(function (entityForm) {
+                    LLP.SetExecutionContext(entityForm);
+                    MAServiceOn.SetEditability(entityForm);
+                });
+            }
+            catch (e) {
+                LLP.LOG.Error(LLP.Enums.Module.MAServiceOn, "OnLoad: ", e);
+            }
+        },
+        OnSave: function (entityForm) {
+            try {
+                if (MAServiceOn.SetToCompleted) {
+                    MAServiceOn.SetCompleted(entityForm.entity);
+                }
+            }
+            catch (e) {
+                LLP.LOG.Error(LLP.Enums.Module.MAServiceOn, "OnSave", e);
+            }
+        },
+
+
+        OnPostSave: function (entityForm)
+        {
+            try {
+                MAServiceOn.UpdateVisitActivity(MAServiceOn.SetToCompleted,entityForm.entity)
+            }
+            catch (e) {
+                LLP.LOG.Error(LLP.Enums.Module.MAServiceOn, "OnPostSave", e);
+            }
+        },
+
+        UpdateVisitActivity: function (setToCompleted, entity)
+        {
+            try {
+                var entityRef = new MobileCRM.Reference(entity.entityName, entity.id, entity.primaryName);
+                var pe_VisitActivityRef = LLP.Common.GetAttributeValue(entity, "pe_visitactivityid");
+                var pe_visitactivityEdit = new MobileCRM.DynamicEntity.createNew("pe_visitactivity");
+                pe_visitactivityEdit.isNew = false;
+                pe_visitactivityEdit.id = pe_VisitActivityRef.id;
+
+                if (setToCompleted) {
+                    LLP.Common.SetAttributeValue(pe_visitactivityEdit, "pe_lastrun", new Date());
+                    LLP.Common.SetAttributeValue(pe_visitactivityEdit, "statuscode", 100000000); // completed
+                }
+
+                LLP.Common.SetAttributeValue(pe_visitactivityEdit, "pe_maserviceonid", entityRef);
+
+                pe_visitactivityEdit.save(
+                     function (err)
+                     {
+                         if (err) {
+                             LLP.LOG.Error(LLP.Enums.Module.MAServiceOn, "Error Save pe_visitactivityEdit -> callback: ", err);
+                         }
+                     }
+                );
+
+
+            } catch (e) {
+                LLP.LOG.Error(LLP.Enums.Module.MAServiceOn, "OnPostSave", e);
+            }
+
+        }
+
+
+    }
+
+    window.onload = function () {
+        MAServiceOn.OnLoad();
+    }
+
+    </script>
+</body>
+</html>

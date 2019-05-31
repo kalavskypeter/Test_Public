@@ -1,0 +1,155 @@
+﻿<!DOCTYPE html>
+
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="utf-8" />
+    <title>Empty Offline HTML page</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="initial-scale=1, user-scalable=no" />
+    <script src="..\Common\JSBridge.js"></script>
+    <script src="..\Common\pe_GlobalCommonFunctions.js"></script>
+</head>
+<body>
+    <script>
+        var InventoryCheckLineRow = InventoryCheckLineRow || {
+            Enums: {
+                DisplayViewName: {
+                    General: "General"
+                }
+            },
+            StatusCodeOptionSetValues: null,
+            OriginalStatusCode: null,
+            AllowedStatusCodesForIsCreate: [100000002, 100000004, 100000005],
+            AllowedStatusCodesForQuantityEqual: [100000007],
+            AllowedStatusCodesForQuantityGreaterThan: [100000002, 100000004, 100000005],
+            AllowedStatusCodesForQuantityLessThan: [100000000, 100000001, 100000002, 100000003, 100000004, 100000006],
+            NoteRequiredForStatusCodes: [100000000, 100000002, 100000005, 100000006],
+            CheckStatusCode: function(entity) {
+                try {
+                    var quantity = LLP.Common.GetAttributeValue(entity, "pe_quantity");
+                    var pe_originalquantity = LLP.Common.GetAttributeValue(entity, "pe_originalquantity");
+                    var statuscode = LLP.Common.GetAttributeValue(entity, "statuscode");
+                    var isValid = true;
+                    var allowedStatusCodes = null;
+
+                    if (entity.isNew) {
+                        isValid = InventoryCheckLineRow.IsStatusCodeValid(statuscode, InventoryCheckLineRow.AllowedStatusCodesForIsCreate);
+                        if (!isValid) {
+                            allowedStatusCodes = "Moved, Rebranding or Found";
+                        }
+                    }
+                    else if (quantity == pe_originalquantity) {
+                        isValid = InventoryCheckLineRow.IsStatusCodeValid(statuscode, InventoryCheckLineRow.AllowedStatusCodesForQuantityEqual);
+                        if (!isValid) {
+                            allowedStatusCodes = "OK";
+                        }
+                    }
+                    else if (quantity < pe_originalquantity) {
+                        isValid = InventoryCheckLineRow.IsStatusCodeValid(statuscode, InventoryCheckLineRow.AllowedStatusCodesForQuantityLessThan);
+                        if (!isValid) {
+                            allowedStatusCodes = "Theft, DamagedInOutlet, Moved, Larceny, Rebranding or Lost";
+                        }
+                    }
+                    else {
+                        isValid = InventoryCheckLineRow.IsStatusCodeValid(statuscode, InventoryCheckLineRow.AllowedStatusCodesForQuantityGreaterThan);
+                        if (!isValid) {
+                            allowedStatusCodes = "Moved, Rebranding or Found";
+                        }
+                    }
+
+                    if (!isValid) {
+                        MobileCRM.bridge.alert("Allowed values are: " + allowedStatusCodes);
+                        LLP.Common.SetAttributeValue(entity, "statuscode", InventoryCheckLineRow.OriginalStatusCode);
+                    }
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.InventoryCheckLineRow, "CheckStatusCode: ", e);
+                }
+            },
+            IsStatusCodeValid: function (statuscode, allowedValues) {
+                try {
+                    for (var i = 0; i < allowedValues.length; i++) {
+                        if (allowedValues.indexOf(statuscode) >= 0) {
+                            return true;
+                        }
+                    }
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.InventoryCheckLineRow, "IsStatusCodeValid: ", e);
+                }
+
+                return false;
+            },
+            OnClick: function(entityList) {
+                try {
+                    var context = entityList.context;
+                    if (context.propertyName == "statuscode") {
+                        InventoryCheckLineRow.OriginalStatusCode = LLP.Common.GetAttributeValue(context.entities[0], "statuscode");
+                    }
+
+                    MobileCRM.UI.EntityList.clickCell(context.event.row, context.event.cell, MobileCRM.bridge.alert, null);
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.InventoryCheckLineRow, "OnClick: ", e);
+                }
+            },
+            OnChange: function (entityList) {
+                try {
+                    var context = entityList.context;
+                    if (context.propertyName == "statuscode") {
+                        InventoryCheckLineRow.CheckStatusCode(entityList.context.entities[0]);
+                    }
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.InventoryCheckLineRow, "OnChange: ", e);
+                }
+            },
+            OnLoad: function () {
+                try {
+                    MobileCRM.UI.EntityList.onClick(InventoryCheckLineRow.OnClick, true);
+                    MobileCRM.UI.EntityList.onChange(InventoryCheckLineRow.OnChange, true, null);
+                    MobileCRM.UI.EntityList.onSave(InventoryCheckLineRow.OnSave, true, null);
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.InventoryCheckLineRow, "OnLoad: ", e);
+                }
+            },
+            OnSave: function (entityList) {
+                try {
+                    var editedEntities = entityList.context.entities;
+                    var saveHandler = entityList.suspendSave();
+                    var failEntities = "";
+                    var delimiter = "";
+
+                    for (var i = 0; i < editedEntities.length; i++) {
+                        var statusCode = LLP.Common.GetAttributeValue(editedEntities[i], "statuscode");
+                        var pe_note = LLP.Common.GetAttributeValue(editedEntities[i], "pe_note");
+                        if (InventoryCheckLineRow.NoteRequiredForStatusCodes.indexOf(statusCode) >= 0 && LLP.Common.IsNullOrEmpty(pe_note)) {
+                            failEntities += delimiter + editedEntities[i].primaryName;
+
+                            if (LLP.Common.IsNullOrEmpty(delimiter)) {
+                                delimiter = "\n, ";
+                            }
+                        }
+                    }
+
+                    if (!LLP.Common.IsNullOrEmpty(failEntities)) {
+                        MobileCRM.bridge.alert("Note is required on these records:\n" + failEntities);
+                    }
+                    else {
+                        saveHandler.resumeSave();
+                    }
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.InventoryCheckLineRow, "OnSave: ", e);
+                }
+            }
+        }
+
+        window.onload = function () {
+            InventoryCheckLineRow.OnLoad();
+        }
+        
+    </script>
+</body>
+</html>

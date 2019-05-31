@@ -1,0 +1,171 @@
+﻿<!DOCTYPE html>
+
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="utf-8" />
+    <title>Empty Offline HTML page</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="initial-scale=1, user-scalable=no" />
+    <script src="..\Common\JSBridge.js"></script>
+    <script src="..\Common\pe_GlobalCommonFunctions.js"></script>
+    <script src="..\Common\jquery-3.3.1.min.js"></script>
+    <script src="..\Common\popper.min.js"></script>
+    <script src="..\Common\bootstrap.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="..\Common\bootstrap.min.css">
+    <script src="OrderCampaignCompute.js"></script>
+</head>
+<body>
+
+
+    <div id="mainHtml"></div>
+    <script>
+        var OrderCampaignCompute = OrderCampaignCompute || {
+
+            OnLoad: function ()
+            {
+               
+                MobileCRM.bridge.onGlobalEvent("CampaignInfoSet", function (args)
+                {  // pro ziskani parametru z predesleho okna
+                    var campaignIfo = args;
+                    OrderCampaignCompute.GenerateInfoHtml(campaignIfo);
+                }, true);
+
+                // zavolam predesle okno a ziskam pozadovane parametry
+                MobileCRM.bridge.raiseGlobalEvent("CampaignInfoGet", null);
+            },
+
+            GenerateInfoHtml: function(campaignIfo)
+            {
+                for (var i = 0; i < campaignIfo.length; i++) {
+
+                    OrderCampaignCompute.WriteHtmlTagCampaignInfo(
+                        campaignIfo[i].CampaignName,
+                        campaignIfo[i].NumberOfProduct,
+                        campaignIfo[i].MaximumNumberOfPackage,
+                        campaignIfo[i].NumberOfBenefitPerPackage
+
+                        );
+
+                    for (var indexSection = 0; indexSection < campaignIfo[i].SectionList.length; indexSection++) {
+                        OrderCampaignCompute.WriteHtmlTagSection(
+                            campaignIfo[i].SectionList[indexSection].SectionName,
+                            campaignIfo[i].SectionList[indexSection].Maximum,
+                            campaignIfo[i].SectionList[indexSection].Minimum
+                            );
+
+                        OrderCampaignCompute.WriteProductList(campaignIfo[i].SectionList[indexSection].ProductList);
+                    }
+
+                    OrderCampaignCompute.WriteHtmlTagHR();
+                }
+            },
+
+            WriteHtmlTagHR: function ()
+            {
+                try {
+                    var body = document.getElementById('mainHtml');
+                    var h1Element = document.createElement('hr');
+                    body.appendChild(h1Element);
+                } catch (e) {
+
+                }
+            },
+
+
+            WriteProductList: function (productList)
+            {
+                try {
+
+
+                    if (LLP.Common.IsNullOrEmpty(productList))
+                    {
+                        return;
+                    }
+                    var body = document.getElementById('mainHtml');
+                    var ulElement = document.createElement('ul');
+
+
+                    for (var i = 0; i < productList.length; i++) {
+                        var li = document.createElement('li');
+                        li.appendChild(document.createTextNode(productList[i].ProductName));
+                        ulElement.appendChild(li);
+                    }
+
+                    body.appendChild(ulElement);
+
+                } catch (e) {
+    
+                }
+            },
+
+            WriteHtmlTagCampaignInfo: function (sectionName, numberOfProducts, maxPackages, vouchersPerPackage )
+            {
+                try {
+                    var body = document.getElementById('mainHtml');
+                    var h1Element = document.createElement('h3');
+                    h1Element.appendChild(document.createTextNode(sectionName));
+                    body.appendChild(h1Element);
+
+                    var divElement = document.createElement('div');
+                    divElement.appendChild(document.createTextNode("Number of Products (Threshold): " + numberOfProducts));
+                    body.appendChild(divElement);
+
+                    var divElement = document.createElement('div');
+                    divElement.appendChild(document.createTextNode("Max packages: " + maxPackages));
+                    body.appendChild(divElement);
+                   
+                    var divElement = document.createElement('div');
+                    divElement.appendChild(document.createTextNode("Vouchers per package: " + vouchersPerPackage));
+                    body.appendChild(divElement);
+
+                } catch (e) {
+
+                }
+            },
+
+            WriteHtmlTagSection: function (sectionName,maximum,minimum)
+            {
+                try {
+                    var body = document.getElementById('mainHtml');
+                    var h1Element = document.createElement('h4');
+                    h1Element.appendChild(document.createTextNode(sectionName));
+                    body.appendChild(h1Element);
+
+                    var divElement = document.createElement('div');
+                    divElement.appendChild(document.createTextNode("Maximum: " + maximum + " Minimum: " + minimum));
+                    body.appendChild(divElement);
+
+                } catch (e) {
+
+                }
+            },
+            WriteHtmlTagDiv: function (textValue)
+            {
+                try {
+                    var body = document.getElementById('mainHtml');
+                    var divElement = document.createElement('div');
+
+                    var label = document.createElement('label');
+                    label.appendChild(document.createTextNode(textValue));
+                    
+                    label.setAttribute('class', 'col-sm-2 col-form-label');
+                    
+                    var containerRow = document.createElement('div');
+                    containerRow.setAttribute('class', 'form-group ');
+                    containerRow.appendChild(label);
+
+                    body.appendChild(containerRow);
+
+                } catch (e) {
+
+                }
+            },
+
+        }
+        window.onload = function ()
+        {
+            OrderCampaignCompute.OnLoad();
+        }
+    </script>
+</body>
+</html>

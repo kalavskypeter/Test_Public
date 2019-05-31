@@ -1,0 +1,26 @@
+﻿<EntityChart>
+  <Name>Default - Copy</Name>
+  <Kind>Donut</Kind>
+  <LimitCount>3</LimitCount>
+  <Axis>transactioncurrencyid</Axis>
+  <MinValue>
+    <Color>#FF0000FF</Color>
+  </MinValue>
+  <MaxValue>
+    <Color>#FF0000FF</Color>
+  </MaxValue>
+  <TargetValue>
+    <Color>#FF0000FF</Color>
+  </TargetValue>
+  <SerializedBindings/>
+  <Attributes>
+    <EntityName>salesorder</EntityName>
+    <CamelCase>salesorder</CamelCase>
+  </Attributes>
+  <Series>
+    <Series>
+      <Attribute>transactioncurrencyid</Attribute>
+      <Color>#FF0000FF</Color>
+    </Series>
+  </Series>
+</EntityChart>

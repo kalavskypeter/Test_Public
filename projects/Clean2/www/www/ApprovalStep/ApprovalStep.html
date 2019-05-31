@@ -1,0 +1,68 @@
+﻿<!DOCTYPE html>
+
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="utf-8" />
+    <title>Empty Offline HTML page</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="initial-scale=1, user-scalable=no" />
+    <script src="..\Common\JSBridge.js"></script>
+    <script src="..\Common\pe_GlobalCommonFunctions.js"></script>
+</head>
+<body onload="ApprovalStep.OnLoad();">
+    <label id="logLabel"></label>
+    <script>
+
+        // Task 4722
+        // zase klikarna jako prase v Rescu
+        // - bavil jsem se s PDA to nechat na vas
+
+        // Mame entitu llp_approvalprocess a na ni pole llp_summary, navaznou entitu llp_approvalstep
+        // - v CRM na Stepu kliknes, pridat Quickview...v Rescu to nejde
+        // - defacto bych potreboval nejak zobrazit informace z llp_approvalprocess.llp_summary na formulari llp_approvalstep
+
+        var ApprovalStep = ApprovalStep || {
+            Enums: {
+                // Detail view display name
+                DisplayName: {
+                    General: "General"
+                }
+            },
+            // ON LOAD FORM
+            OnLoad: function () {
+                try {
+                    MobileCRM.UI.EntityForm.requestObject(function (entityForm) {
+                        LLP.SetExecutionContext(entityForm);
+                        if (LLP.Form.IsCreate()) {
+                            return;
+                        }
+
+                        var llp_approvalprocessidRef = LLP.Common.Attribute_GetValue(ApprovalStep.Enums.DisplayName.General, "llp_approvalprocessid");
+                        //var summary = ApprovalStep.RetrieveAndSetSummary(llp_approvalprocessidRef.id);
+
+                        MobileCRM.DynamicEntity.loadById("llp_approvalprocess", llp_approvalprocessidRef.id,
+                            function (result) {
+                                var a = 5;
+                                //LLP.Common.Attribute_SetValue(ApprovalStep.Enums.DisplayName.General, "process_summary", );
+                            },
+                            function(errorMessage){
+                                LLP.LOG.Error("OnLoad -> MobileCRM.Reference.loadById:", errorMessage);
+                            },
+                            null)
+                    },
+                    function (errorMessage) {
+                        LLP.LOG.Error("OnLoad -> MobileCRM.UI.EntityForm.requestObject:", errorMessage);
+                    },
+                    null);
+                } catch (e) {
+                    LLP.LOG.Error("OnLoad:", e);
+                }
+            },
+            OnSave: function (entityForm) {
+                LLP.SetExecutionContext(entityForm);
+            }
+        };
+    </script>
+
+</body>
+</html>

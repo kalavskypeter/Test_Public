@@ -1,0 +1,648 @@
+﻿<!DOCTYPE html>
+
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="utf-8" />
+    <title>Empty Offline HTML page</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="initial-scale=1, user-scalable=no" />
+    <script src="..\Common\JSBridge.js"></script>
+    <script src="..\Common\pe_GlobalCommonFunctions.js"></script>
+    <script src="..\Common\jquery-3.3.1.min.js"></script>
+    <script src="..\Common\popper.min.js"></script>
+    <script src="..\Common\bootstrap.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="..\Common\bootstrap.min.css">
+</head>
+<body>
+    
+    <div class="container">
+        <div class="row">
+            <div class="col">
+                <button id="btnComplete" class="btn btn-primary btn-block" onclick="Complaint.OnClick_Complete();">Completed</button>
+            </div>
+        </div>
+    </div>
+    <label id="logLabel"></label>
+
+    <script>
+        //***************************************************************************************************************************
+        //Task 5005 |
+        //----------
+        //mame entitu pe_complaint
+        //na ni jsou pole: 
+        //pe_brandid = znacka
+        //pe_packagingcapacityid
+        //pe_beerweight
+
+        //resit pouze pokud je pe_complaint.pe_complainttype = 100 000 001
+
+        //obchodnik naklikava formular (typu Complaint type = KEG/TANK), vybere znacku (sud plzne), nastavi expiraci...a dalsi policka, 
+        //kdyz pivo jiz neexpirovalo (jiny task) musi vzit sud piva a fyzicky ho zvazit a toto napsat do pole pe_beerweight
+
+        //a ted dochazi ke kontrole hmonosti:
+        //je potreba si nacist tu brand a packaging capacity (oboji ciselnikove entity) a pokud:
+        //Keg 20l mene nez 23kg
+        //Keg 30l mene nez 32,75kg
+        //Keg 50l mene nez 50,1kg
+        //GROLSCH 30l mene nez 33,5kg
+        //Pilsner Urquell 30l mene nez 32,3kg
+
+        //nastavit opet pe_complaintreasonid = 
+        //Sales reason/No reason
+        //a opet toto pole zamknout, aby nemohl obchodnik nic delat
+
+        //samozrejme pokud by opravil pe_beerweight a hmostnost se dostala nad hranici, tak pole 
+        //Sales reason/No reason
+        //opet odemknout a vymazat, aby mohl obchodnik hodnotu natavit sam
+        //***************************************************************************************************************************
+        //Task 5006 |
+        //----------
+        //existuje entita: pe_complaint (Complaint)
+        //na ni je picklist: pe_complainttype, ktery ma dve hodnoty
+
+        //uzivatel si bude muset na zacatku zvolit, ktery typ Complaint bude delat a podle toho se mu zobrazi pole
+
+        //0) pe_complainttype == null
+        //zobrazit vzdy:
+        // pe_complainttype (nastaveno jako povinne z CRM)
+
+        //1) pe_complainttype == 100 000 001 (KEG/TANK)
+        //zobrazit:
+        //  pe_accountid
+        //  pe_contactid
+        //  pe_wholesalerid
+        //  pe_brandid
+        //  pe_packagingtype
+        //  pe_packagingcapacityid
+        //  pe_quantity
+        //  pe_expirationdate
+        //  pe_batchnumber
+        //  pe_kegbarcode
+        //  pe_kegnumber
+        //  pe_beerweight
+        //  pe_sealnumber
+        //  pe_complaintreasonid
+        //  pe_beerdeliverydatefromwarehouse
+        //  pe_comments
+        //  pe_confirmed
+
+
+        //2) pe_complainttype == 100 000 000 (CAN/BOTTLE)
+        //zobrazit tyto pole:
+        //  pe_accountid
+        //  pe_contactid
+        //  pe_wholesalerid
+        //  pe_brandid
+        //  pe_packagingtype
+        //  pe_packagingcapacityid
+        //  pe_quantity
+        //  pe_expirationdate
+        //  pe_batchnumber
+        //  pe_complaintreasonid
+        //  pe_beerdeliverydatefromwarehouse
+        //  pe_comments
+
+        //povinnosti poli:
+        //  pokud bude v poli pe_complaintreasonid == "Sales reason/No reason" tak nastavit, ze pole pe_confirmed a pe_comments jsou povinna
+        //  nastaveno jiz z CRM, ale ktera pole jsou povinna vzdy: pe_accountid, pe_complaintreasonid, pe_complainttype 
+        //***************************************************************************************************************************
+        //Task 5068 |
+        //----------
+        //stejny princip jako na Product exchange
+
+        //Potřeboval bych programově vytvořit pole (vlozit ho pod account a nejak ho vizualne oddelit) a dotahnout informace z Accountu:
+        //Customer ID: pe_accountid.msdyn_externalaccountid
+        //Address: (ulice, mesto, PSC, stat) pe_accountid.address1_line1, pe_accountid.address1_city, pe_accountid.address1_postalcode, pe_accountid.address1_country
+        //Area: pe_accountid.pe_areaid
+        //District: pe_accountid.territoryid
+        //Region: pe_accountid.pe_regionid
+        //***************************************************************************************************************************
+        //Task 5096
+        //potreboval bych upravit hlidani vahy v Resco:
+
+        //    vznikla nova entita: pe_minimumbrandpackagingcapacity
+        //ktera ma vazbu na Brand (pe_brandid), Packaging Capacity (pe_packagingcapacityid) a parametr minimalni pozadovane vahy: pe_minimumrequiredweight
+        //- pokud neni pe_minimumbrandpackagingcapacity.pe_brandid vyplnen, plati obecne pro danou kapacitu
+        //--------
+        //potreboval bych kontrolovat pe_complaint pouze pokud pe_complaint.pe_complainttype = 100 000 001 (pouze pokud je complaint typ je KEG/TANK) 
+        //hlidat pole pe_complaint.pe_beerweight vzhledem k nove entite pe_minimumbrandpackagingcapacity
+        //Pokud pole pe_complaint.pe_beerweight bude mit nizsi hodnotu nez pe_minimumbrandpackagingcapacity.pe_minimumrequiredweight (samozrejme vzhledem k poli pe_complaint.pe_brandid
+        //a pe_complaint.pe_packagingcapacityid) opet nastavit pe_complaint.pe_complaintreasonid= Sales reason/No reason a dat ho jen pro cteni, samozrejme pokud se podminka zrusi 
+        //pe_complaint.pe_complaintreasonid promazat a povolit ho pro editaci
+        //***************************************************************************************************************************
+        //Task 5266 |
+        //----------
+        //1) pri ukladani CAN hazi chybu, vypada to, ze nektere attrb ktere se maji dat inVisible tak na formu nejsou
+        //2) pokud je complaint typu CAN == 100,000,000
+        // - nesmi byt povinne ani byt videt attrb: pe_confirmed
+        //3) na formular pridan status Reason - nastavit jej jen pro cteni a viditelny vzdy (idealne az po zvoleni typy complaint)
+        //4) vytvorit tlacitko "Completed", ktere bude delat: (tento princip bude globalni, vsude bude tlacitko "hotovo", ktere udela neco...)
+        //- tlacitko bude aktivni pouze tehdy pokud je statuscode == 1 (Draft)
+        //- nastavi statuscode = 100000000
+        //- zamkne vsechny pole = nastavi vsechny pole na readonly
+        //***************************************************************************************************************************
+        //Task 5271 |
+        //----------
+        //Resco
+        //----
+        //entita: pe_complaint
+        //----
+        //a) prejmenovat tlacitko na Completed
+        //b) nastavit pole readonly kdyz je statuscode=100,000,000 (kdyz klikne na tlacitko, tlacitko nastavi status code = completed, tak uz nesmi na formu nic zmenit)
+        //b0) spolecne..nevim zda chces resit:
+        //pe_complainttype
+        //pe_accountid
+        //pe_contactid
+        //pe_brandid
+        //pe_packagingcapacityid
+        //pe_expirationdate
+        //pe_complaintreasonid
+        //pe_comments
+        //pe_quantity
+        //pe_wholesalerid
+        //pe_beerdeliverydatefromwarehouse
+        //pe_batchnumber
+        //statuscode
+
+        //b1) pe_complainttype == 100,000,000 (CAN/BOTTLE)
+        //- toto neni potreba resit, vsechny pole jsou v b0)
+
+        //b2) pe_complainttype == 100,000,001 (KEG/TANK)
+        //pe_kegnumber
+        //pe_kegbarcode
+        //pe_beerweight
+        //pe_sealnumber
+        //pe_confirmed
+
+        var Complaint = Complaint || {
+            Enums: {
+                DisplayViewName: {
+                    General: "General"
+                },
+                ComplaintType: {
+                    CAN_BOTTLE: 100000000,
+                    KEG_TANK: 100000001
+                },
+                StatusCode: {
+                    Draft: 1,
+                    Completed: 100000000,
+                    Inactive: 2
+                }
+            },
+            KegWeights: [],
+            ComplaintReason: null,
+            ComplaintReasonName: "Sales reason/No reason", // TODO: toto se mi nelibi - nazev natvrdo
+            FieldsToDisplay: {},
+            FieldsReadOnly: {},
+            SetToCompleted: false,
+            CheckWeightAndExpirationDate: function() {
+                var date = LLP.Common.Attribute_GetValue(Complaint.Enums.DisplayViewName.General, "pe_expirationdate");
+                var pe_complainttype = LLP.Common.Attribute_GetValue(Complaint.Enums.DisplayViewName.General, "pe_complainttype");
+                var pe_brandid = LLP.Common.Attribute_GetValue(Complaint.Enums.DisplayViewName.General, "pe_brandid");
+                var pe_beerweight = LLP.Common.Attribute_GetValue(Complaint.Enums.DisplayViewName.General, "pe_beerweight");
+                var pe_packagingcapacityid = LLP.Common.Attribute_GetValue(Complaint.Enums.DisplayViewName.General, "pe_packagingcapacityid");
+
+                var kegWeight = Complaint.GetKegWeight(pe_brandid, pe_packagingcapacityid);
+
+                let message = "";
+                let delimiter = "";
+
+                if (date && date < new Date()) {
+                    message += "Product has expired";
+                    delimiter = "\r\n";
+                }
+
+                if (pe_complainttype == Complaint.Enums.ComplaintType.KEG_TANK && kegWeight &&
+                    kegWeight > pe_beerweight || (date && date < new Date())) {
+                    Complaint.RetrieveComplaintReason(function () {
+                        MobileCRM.UI.EntityForm.requestObject(function (entityForm) {
+                            LLP.SetExecutionContext(entityForm);
+                            Complaint.SetComplaintReason(true);
+
+                            if (kegWeight > pe_beerweight) {
+                                message += delimiter + "Beer weight is too low";
+                            }
+                        },
+                        function (error) {
+                            LLP.LOG.Error(LLP.Enums.Module.Complaint, "CheckWeight -> RetrieveComplaintReason callback: ", error);
+                        }, null);
+                    });
+                }
+                else {
+                    Complaint.SetComplaintReason(false);
+                }
+
+                if (!LLP.Common.IsNullOrEmpty(message)) {
+                    MobileCRM.bridge.alert(message);
+                }
+            },
+            GetKegWeight: function (selectedBrandid, selectedPackagingcapacityid) {
+                try {
+                    for(var i = 0; i < Complaint.KegWeights.length; i++) {
+                        var pe_brandid = LLP.Common.GetAttributeValue(Complaint.KegWeights[i], "pe_brandid");
+                        var pe_packagingcapacityid = LLP.Common.GetAttributeValue(Complaint.KegWeights[i], "pe_packagingcapacityid");
+                        if ((selectedBrandid && pe_brandid && selectedBrandid.id == pe_brandid.id) ||
+                            (selectedPackagingcapacityid && pe_packagingcapacityid && selectedPackagingcapacityid.id == pe_packagingcapacityid.id)) {
+                            return LLP.Common.GetAttributeValue(Complaint.KegWeights[i], "pe_minimumrequiredweight");
+                        }
+                    }
+                    
+                    return null;
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Complaint, "GetCagWeight: ", e);
+                }
+            },
+            SetComplaintReason: function (setDisabled) {
+                try {
+                    //if (!Complaint.ComplaintReason) {
+                    //    return;
+                    //}
+
+                    if (setDisabled) {
+                        LLP.Common.Attribute_SetValue(Complaint.Enums.DisplayViewName.General, "pe_complaintreasonid", new MobileCRM.Reference("pe_complaintreason", Complaint.ComplaintReason.id, Complaint.ComplaintReason.primaryName));
+                    }
+                    else {
+                        LLP.Common.Attribute_SetValue(Complaint.Enums.DisplayViewName.General, "pe_complaintreasonid", null);
+                        //Complaint.CheckComplaintReason();
+                    }
+
+                    LLP.Common.Attribute_IsDisabled(Complaint.Enums.DisplayViewName.General, "pe_complaintreasonid", setDisabled);
+                    LLP.Common.Attribute_IsRequired(Complaint.Enums.DisplayViewName.General, "pe_complaintreasonid", !setDisabled);
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Complaint, "SetComplaintReason: ", e);
+                }
+            },
+            RetrieveComplaintReason: function (callback) {
+                try {
+                    var xml = '<fetch>\
+		                        <entity name="pe_complaintreason">\
+                                <attribute name="pe_complaintreasonid" />\
+                                <attribute name="pe_name" />\
+		                        <filter type="and">\
+			                        <condition attribute="pe_name" operator="eq" value="' + Complaint.ComplaintReasonName + '" />\
+		                        </filter>\
+		                        </entity>\
+	                        </fetch>';
+
+                    MobileCRM.FetchXml.Fetch.deserializeFromXml(xml, function (fetch) {
+                        fetch.execute("DynamicEntities", function (result) {
+                            if (result.length > 0) {
+                                Complaint.ComplaintReason = result[0];
+                            }
+                            else {
+                                MobileCRM.bridge.alert(Complaint.ComplaintReasonName + " not found");
+                            }
+                            callback();
+                        },
+                        function (error) {
+                            LLP.LOG.Error(LLP.Enums.Module.Complaint, "RetrieveComplaintReason -> callback error: ", error);
+                            callback();
+                        });
+                    }, MobileCRM.bridge.alert);
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Complaint, "RetrieveComplaintReason: ", e);
+                }
+            },
+            SetVisibility: function () {
+                try {
+                    var pe_complainttype = LLP.Common.Attribute_GetValue(Complaint.Enums.DisplayViewName.General, "pe_complainttype");
+
+                    var allAttributes = LLP.Common.Attribute_GetAllInView(Complaint.Enums.DisplayViewName.General);
+                    for (var i = 0; i < allAttributes.length; i++) {
+                        var name = allAttributes[i].name;
+
+                        if (name == "pe_complainttype") {
+                            continue;
+                        }
+
+                        var visible = false;
+                        if(pe_complainttype != -1) { 
+                            visible = Complaint.FieldsToDisplay[pe_complainttype].indexOf(name) >= 0;
+                        }
+
+                        LLP.Common.Attribute_Visibility(Complaint.Enums.DisplayViewName.General, name, visible);
+                        
+                        if (name == "pe_confirmed") {
+                            LLP.Common.Attribute_IsRequired(Complaint.Enums.DisplayViewName.General, name, visible);
+                        }
+                    }
+
+                    if (pe_complainttype == -1) {
+                        LLP.Common.Attribute_Visible(Complaint.Enums.DisplayViewName.General, "pe_complainttype");
+                    }
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Complaint, "SetVisibility: ", e);
+                }
+            },
+            SetEditability: function() {
+                try {
+                    LLP.Common.Attribute_Disabled(Complaint.Enums.DisplayViewName.General, "statuscode");
+                    var statuscode = LLP.Common.Attribute_GetValue(Complaint.Enums.DisplayViewName.General, "statuscode");
+
+                    if (statuscode == Complaint.Enums.StatusCode.Completed) {
+                        LLP.HtmlControl.SetDisabled("btnComplete", true);
+                        LLP.Form.Disabled();
+                        return;
+                    }
+
+                    LLP.Form.Enabled();
+                    LLP.Common.Attribute_IsDisabled(Complaint.Enums.DisplayViewName.General, "statuscode", true);
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Complaint, "SetEditability ", e);
+                }
+            },
+            GetMinimumWeights: function () {
+                try {
+                    var xml = '<fetch>\
+		                            <entity name="pe_minimumbrandpackagingcapacity">\
+                                        <attribute name="pe_brandid" />\
+                                        <attribute name="pe_packagingcapacityid" />\
+                                        <attribute name="pe_minimumrequiredweight" />\
+		                            </entity>\
+	                            </fetch>';
+
+                    MobileCRM.FetchXml.Fetch.deserializeFromXml(xml, function (fetch) {
+                        fetch.execute("DynamicEntities", function (result) {
+                            Complaint.KegWeights = result;
+                            //for (var i = 0; i < result.length; i++) {
+                                
+                            //    var pe_brandid = LLP.Common.GetAttributeValue(result[i], "pe_brandid");
+                            //    if (pe_brandid) {
+                            //        [pe_brandid.id] = LLP.Common.GetAttributeValue(result[i], "pe_minimumrequiredweight");
+                            //    }
+                            //}
+                            
+                        },
+                        function (error) {
+                            LLP.LOG.Error(LLP.Enums.Module.Complaint, "GetMinimumWeights -> fetch.execute callback error: ", error);
+                        });
+                    }, MobileCRM.bridge.alert);
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Complaint, "GetMinimumWeights: ", e);
+                }
+            },
+            InitFieldsToDisplayAndReadOnly: function() {
+                Complaint.FieldsToDisplay[Complaint.Enums.ComplaintType.CAN_BOTTLE] = ["pe_accountid"
+                                                                                        , "accountdetail"
+                                                                                        , "statuscode"
+                                                                                        , "pe_contactid"
+                                                                                        , "pe_wholesalerid"
+                                                                                        , "pe_brandid"
+                                                                                        , "pe_packagingtype"
+                                                                                        , "pe_packagingcapacityid"
+                                                                                        , "pe_quantity"
+                                                                                        , "pe_expirationdate"
+                                                                                        , "pe_batchnumber"
+                                                                                        , "pe_complaintreasonid"
+                                                                                        , "pe_beerdeliverydatefromwarehouse"
+                                                                                        ,  "pe_comments"];
+                Complaint.FieldsToDisplay[Complaint.Enums.ComplaintType.KEG_TANK] = ["pe_accountid"
+                                                                                        , "accountdetail"
+                                                                                        , "statuscode"
+                                                                                        , "pe_contactid"
+                                                                                        , "pe_wholesalerid"
+                                                                                        , "pe_brandid"
+                                                                                        , "pe_packagingtype"
+                                                                                        , "pe_packagingcapacityid"
+                                                                                        , "pe_quantity"
+                                                                                        , "pe_expirationdate"
+                                                                                        , "pe_batchnumber"
+                                                                                        , "pe_kegbarcode"
+                                                                                        , "pe_kegnumber"
+                                                                                        , "pe_beerweight"
+                                                                                        , "pe_sealnumber"
+                                                                                        , "pe_complaintreasonid"
+                                                                                        , "pe_beerdeliverydatefromwarehouse"
+                                                                                        , "pe_comments"
+                                                                                        , "pe_confirmed"];
+                Complaint.FieldsReadOnly[Complaint.Enums.ComplaintType.CAN_BOTTLE] = ["pe_complainttype"
+                                                                                        , "pe_accountid"
+                                                                                        , "accountdetail"
+                                                                                        , "pe_contactid"
+                                                                                        , "pe_brandid"
+                                                                                        , "pe_packagingcapacityid"
+                                                                                        , "pe_expirationdate"
+                                                                                        , "pe_complaintreasonid"
+                                                                                        , "pe_comments"
+                                                                                        , "pe_quantity"
+                                                                                        , "pe_wholesalerid"
+                                                                                        , "pe_beerdeliverydatefromwarehouse"
+                                                                                        , "pe_batchnumber"
+
+                                                                                        , "statuscode"];
+                Complaint.FieldsReadOnly[Complaint.Enums.ComplaintType.KEG_TANK] = ["pe_kegnumber"
+                                                                                        , "pe_kegbarcode"
+                                                                                        , "pe_beerweight"
+                                                                                        , "pe_sealnumber"
+                                                                                        , "pe_confirmed"
+                                                                                        , "accountdetail"];
+            },
+            SetAccountDetailValues: function (entityForm, callback) {
+                try {
+                    if (entityForm) {
+                        LLP.SetExecutionContext(entityForm);
+                    }
+                    
+                    var pe_accountid = LLP.Common.Attribute_GetValue(Complaint.Enums.DisplayViewName.General, "pe_accountid");
+
+                    if (pe_accountid) {
+                        var pe_account = MobileCRM.DynamicEntity.loadById(pe_accountid.entityName, pe_accountid.id,
+                            function (result) {
+                                MobileCRM.UI.EntityForm.requestObject(function (entityForm) {
+                                    LLP.SetExecutionContext(entityForm);
+                                    var addTextBox = false;
+                                    var textbox = LLP.Common.Attribute_Get(Complaint.Enums.DisplayViewName.General, "accountdetail");
+                                    if (!textbox) {
+                                        addTextBox = true;
+                                        textbox = new MobileCRM.UI.DetailViewItems.TextBoxItem("accountdetail", "Account Detail");
+                                        textbox.isEnabled = false;
+                                        textbox.maxLength = 5000;
+                                        textbox.numberOfLines = 5;
+                                        textbox.style = "MultiLine";
+                                    }
+
+                                    textbox.value = "";
+                                    Complaint.AddValueToMultiline(textbox, "Customer ID: ", LLP.Common.GetAttributeValue(result, "msdyn_externalaccountid"), false);
+                                    Complaint.AddValueToMultiline(textbox, "Address: ", LLP.Common.GetAttributeValue(result, "address1_line1"), true);
+                                    Complaint.AddValueToMultiline(textbox, ", ", LLP.Common.GetAttributeValue(result, "address1_city"), false, true);
+                                    Complaint.AddValueToMultiline(textbox, ", ", LLP.Common.GetAttributeValue(result, "address1_postalcode"), false, true);
+                                    Complaint.AddValueToMultiline(textbox, ", ", LLP.Common.GetAttributeValue(result, "address1_country"), false, true);
+                                    Complaint.AddValueToMultiline(textbox, "Area: ", LLP.Common.GetAttributeValue(result, "pe_areaid"), true);
+                                    Complaint.AddValueToMultiline(textbox, "District: ", LLP.Common.GetAttributeValue(result, "territoryid"), true);
+                                    Complaint.AddValueToMultiline(textbox, "Region: ", LLP.Common.GetAttributeValue(result, "pe_regionid"), true);
+
+                                    if (addTextBox) {
+                                        var detailView = entityForm.getDetailView(Complaint.Enums.DisplayViewName.General);
+                                        var index = detailView.getItemIndex("pe_accountid");
+                                        detailView.insertItem(textbox, index + 1);
+                                    }
+                                    else {
+                                        LLP.Common.Attribute_Visible(Complaint.Enums.DisplayViewName.General, "accountdetail");
+                                    }
+
+                                    if (callback) {
+                                        callback();
+                                    }
+                                },
+                                function (error) {
+                                    LLP.LOG.Error(LLP.Enums.Module.Complaint, "SetAccountDetailValues -> MobileCRM.UI.EntityForm.requestObject:", error);
+                                }, null);
+
+                            },
+                            function (error) {
+                                LLP.LOG.Error(LLP.Enums.Module.Complaint, "SetAccountDetailValues -> load account MobileCRM.DynamicEntity.loadById (" + pe_accountid.id + "):", error);
+                            }, null);
+                    }
+                    else {
+                        var textbox = LLP.Common.Attribute_Get(Complaint.Enums.DisplayViewName.General, "accountdetail");
+                        if (textbox) {
+                            LLP.Common.Attribute_Invisible(Complaint.Enums.DisplayViewName.General, "accountdetail");
+                        }
+                    }
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Complaint, "SetAccountDetailValues:", e);
+                }
+            },
+            AddValueToMultiline: function (control, text, value, newLine, textIsDelimiter) {
+
+                if (!control.value) {
+                    control.value = "";
+                }
+
+                if (newLine) {
+                    control.value += "\n";
+                }
+
+                if (!textIsDelimiter) {
+                    control.value += text;
+                }
+
+                if (value && textIsDelimiter) {
+                    control.value += text + value;
+                }
+                else if (value) {
+                    control.value += value;
+                }
+            },
+            CheckComplaintReason: function () {
+                try {
+                    var selectedValue = LLP.Common.Attribute_GetValue(Complaint.Enums.DisplayViewName.General, "pe_complaintreasonid");
+                    var isRequired = false;
+
+                    if (selectedValue && selectedValue.primaryName == "Sales reason/No reason") {
+                        isRequired = true;
+                    }
+
+                    var pe_confirmed = LLP.Common.Attribute_Get(Complaint.Enums.DisplayViewName.General, "pe_confirmed");
+
+                    LLP.Common.Attribute_IsRequired(Complaint.Enums.DisplayViewName.General, "pe_confirmed", isRequired && pe_confirmed.isVisible);
+                    LLP.Common.Attribute_IsRequired(Complaint.Enums.DisplayViewName.General, "pe_comments", isRequired);
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Complaint, "CheckComplaintReason:", e);
+                }
+            },
+            SetCompleted: function() {
+                LLP.Common.Attribute_SetValue(Complaint.Enums.DisplayViewName.General, "statuscode", Complaint.Enums.StatusCode.Completed);
+            },
+            OnClick_Complete: function() {
+                try {
+                    MobileCRM.UI.EntityForm.requestObject(function (entityForm) {
+                        LLP.SetExecutionContext(entityForm);
+                        Complaint.SetToCompleted = true;
+                        if (!entityForm.isDirty) {
+                            Complaint.SetCompleted();
+                        }
+                        MobileCRM.UI.EntityForm.save();
+                    },
+                    function (error) {
+                        LLP.LOG.Error(LLP.Enums.Module.Complaint, "OnClick_Complete -> MobileCRM.UI.EntityForm.requestObject", error);
+                    }, null)
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Complaint, "OnClick_Complete", e);
+                }
+            },
+            OnChange_ComplaintType: function (entityForm) {
+                LLP.SetExecutionContext(entityForm);
+                Complaint.CheckWeightAndExpirationDate();
+                Complaint.SetVisibility();
+            },
+            OnChange_Brand: function (entityForm) {
+                LLP.SetExecutionContext(entityForm);
+                Complaint.CheckWeightAndExpirationDate();
+            },
+            OnChange_BeerWeight: function(entityForm) {
+                LLP.SetExecutionContext(entityForm);
+                Complaint.CheckWeightAndExpirationDate();
+            },
+            OnChange_ExpirationDate: function(entityForm) {
+                LLP.SetExecutionContext(entityForm);
+                Complaint.CheckWeightAndExpirationDate();
+            },
+            OnChange_PackagingCapacity: function (entityForm) {
+                LLP.SetExecutionContext(entityForm);
+                Complaint.CheckWeightAndExpirationDate();
+            },
+            OnChange_ComplaintReason: function (entityForm) {
+                try {
+                    LLP.SetExecutionContext(entityForm);
+                    Complaint.CheckComplaintReason();
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Complaint, "OnChange_ComplaintReason: ", e);
+                }
+            },
+            OnLoad: function () {
+                try
+                {
+                    Complaint.GetMinimumWeights();
+                    Complaint.InitFieldsToDisplayAndReadOnly();
+                    MobileCRM.UI.EntityForm.onSave(Complaint.OnSave, true, null);
+                    MobileCRM.UI.EntityForm.onItemChange("pe_complainttype", Complaint.OnChange_ComplaintType, true, null);
+                    MobileCRM.UI.EntityForm.onItemChange("pe_brandid", Complaint.OnChange_Brand, true, null);
+                    MobileCRM.UI.EntityForm.onItemChange("pe_beerweight", Complaint.OnChange_BeerWeight, true, null);
+                    MobileCRM.UI.EntityForm.onItemChange("pe_expirationdate", Complaint.OnChange_ExpirationDate, true, null);
+                    MobileCRM.UI.EntityForm.onItemChange("pe_complaintreasonid", Complaint.OnChange_ComplaintReason, true, null);
+                    MobileCRM.UI.EntityForm.onItemChange("pe_packagingcapacityid", Complaint.OnChange_PackagingCapacity, true, null);
+                    MobileCRM.UI.EntityForm.onItemChange("pe_accountid", Complaint.SetAccountDetailValues, true, null);
+                    MobileCRM.UI.EntityForm.requestObject(function (entityForm) {
+                        LLP.SetExecutionContext(entityForm);
+                        Complaint.SetAccountDetailValues(null, function () {
+                            Complaint.SetVisibility();
+                            Complaint.SetEditability();
+                        });
+                    });
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Complaint, "OnLoad: ", e);
+                }
+            },
+            OnSave: function (entityForm) {
+                try {
+
+                    if (Complaint.SetToCompleted) {
+                        LLP.SetExecutionContext(entityForm);
+                        Complaint.SetCompleted();
+                    }
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Complaint, "OnSave: ", e);
+                }
+            }
+        }
+
+        window.onload = function () {
+            Complaint.OnLoad();
+        }
+
+    </script>
+</body>
+</html>

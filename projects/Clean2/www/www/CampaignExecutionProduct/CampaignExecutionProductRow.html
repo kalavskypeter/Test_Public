@@ -1,0 +1,57 @@
+﻿<!DOCTYPE html>
+
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="utf-8" />
+    <title>Empty Offline HTML page</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="initial-scale=1, user-scalable=no" />
+    <script src="..\Common\JSBridge.js"></script>
+    <script src="..\Common\pe_GlobalCommonFunctions.js"></script>
+</head>
+<body>
+    <script>
+
+        var CampaignExecutionProductRow = CampaignExecutionProductRow || {
+            Enums: {
+                CampaignExecutionStatusCode: {
+                    Completed: 1
+                }
+            },
+            CheckCampaignExecutionStatusCode: function (statusCode) {
+                try {
+                    if (statusCode == CampaignExecutionProductRow.Enums.CampaignExecutionStatusCode.Completed) {
+                        MobileCRM.UI.EntityList.selectView("Campaign Execution Products - Read Only");
+                    }
+                    else {
+                        MobileCRM.UI.EntityList.selectView("Campaign Execution Products");
+                    }
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.CampaignExecutionProductRow, "CheckOrderStatusCode", e);
+                }
+            },
+            OnLoad: function () {
+                try
+                {
+                    MobileCRM.UI.EntityList.requestObject(function (entityList) {
+                        var statucode = LLP.Common.GetAttributeValue(entityList.relationship.target, "statuscode");
+                        CampaignExecutionProductRow.CheckCampaignExecutionStatusCode(statucode);
+                    },
+                    function (error) {
+                        LLP.LOG.Error(LLP.Enums.Module.CampaignExecutionProductRow, "OnLoad -> MobileCRM.UI.EntityList.requestObject", error);
+                    }, null);
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.CampaignExecutionProductRow, "OnLoad: ", e);
+                }
+            }
+        }
+
+        window.onload = function () {
+            CampaignExecutionProductRow.OnLoad();
+        }
+
+    </script>
+</body>
+</html>

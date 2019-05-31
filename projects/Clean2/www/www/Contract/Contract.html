@@ -1,0 +1,423 @@
+﻿<!DOCTYPE html>
+
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="utf-8" />
+    <title>Empty Offline HTML page</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="initial-scale=1, user-scalable=no" />
+    <script src="..\Common\JSBridge.js"></script>
+    <script src="..\Common\pe_GlobalCommonFunctions.js"></script>
+    <script src="..\Common\jquery-3.3.1.min.js"></script>
+    <script src="..\Common\popper.min.js"></script>
+    <script src="..\Common\bootstrap.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="..\Common\bootstrap.min.css">
+</head>
+<body>
+    
+    <div class="container mt-1">
+        <div class="row">
+            <button id="btnCopy" class="btn btn-primary btn-block copy" onclick="Contract.Copy();">Copy</button>
+        </div>
+        <div class="row mt-3">
+            <button id="btnSendToApproval" class="btn btn-primary btn-block" onclick="Contract.OnClick_ChangeStatusCode(this);">Send for Approval</button>
+        </div>
+        <div class="row mt-3">
+            <button id="btnNegotiated" class="btn btn-primary btn-block" onclick="Contract.OnClick_ChangeStatusCode(this);">Negotiated</button>
+        </div>
+        <div class="row mt-3">
+            <button id="btnSigned" class="btn btn-primary btn-block" onclick="Contract.OnClick_ChangeStatusCode(this);">Signed</button>
+        </div>
+        <div class="row mt-3">
+            <button id="btnFinished" class="btn btn-primary btn-block" onclick="Contract.OnClick_ChangeStatusCode(this);">Finished</button>
+        </div>
+        <div class="row mt-3">
+            <button id="btnTerminated" class="btn btn-primary btn-block" onclick="Contract.OnClick_ChangeStatusCode(this);">Terminated</button>
+        </div>
+    </div>
+    
+    <label id="logLabel"></label>
+    <script>
+        //********************************************************************************************************************
+        //Task 4924 |
+        //----------
+        //prosim o analyzu, zda jsme toto schopni udelat v Rescu
+        //- potrebovali bychom zkopirovat entitu Contract a jeji navazne zaznamy Contract Term, jedine co bude rozdilne bude pe_contract.llp_accountid
+        //        1) idealni by bylo kliknout na tlacitko, zeptalo by se to pro jaky account chci zkopirovat radky a zaznam by to ulozilo
+        //        2) pripadna funkcnost - otevru nejaky zaznam, kliknu na tlacitko, zkopiruje se mi to bez Accountu = pujde to i pres nevyplneni Accountu? => uzivatel by 
+        //           pak po otevreni zaznamu..nebo by mu ho Resco rovnou otevrel? pak doplnil Account a hotovo 
+        //********************************************************************************************************************
+        //Task 4937 |
+        //----------
+        //update: task byl hotovy, ale name se neplnilo - jen je potreba zkontrolovat proc a doplnit ten JS hned v Resco:
+        //    ------------------
+        //    potreboval bych plnit na entite: pe_contract 
+        //pe_name = pe_contractheader.pe_name - pe_contract.pe_accountid
+
+        //1) hned v Resco po ulozeni
+        //2) pustit na to normalni plugin
+        //********************************************************************************************************************
+        //Task 5141 |
+        //----------
+        //po pridani pole "pe_contractheaderid" na form v Resco se toto pole neplni a tedy nemuze dojit k ulozeni formulare pri stisknuti tlacita Kopiruj
+        //- tlacitko kopiruj funguje, zobrazi se dialog, vybere se account ale nedoplni se Contract Header, ale uz nejde ulozit
+        //********************************************************************************************************************
+        //Task 5275 |
+        //----------
+        //Resco
+        //---
+        //entita: pe_contract
+        //---
+        //a) tlacitko
+        //- potrebuji pridat nove tlacitko "Send for Approval" (stejne jako u Overtime Request, princip schvalovani by mel byt vsude stejny)
+        //- tlacitko bude aktivni pouze pokud je pe_approvalstatus == null (-1) (= jeste nic neschvaluju)
+        //b) funkce tlacitka
+        //nastavi statuscode = 100,000,002 (to be approved)
+        //nastavi: pe_approvalstatus = 100,000,000 (for approval)
+        //ulozi zaznam
+        //c) zamknout formular
+        //- nastavit pole: pe_approvalstatus pouze pro cteni
+        //- status reason se uzamkne pozdeji, bohuzel zatim tedy neresit
+        //d) jakmile je pe_approvalstatus != null = uz se schvaluje, nebo schvalilo, uzamknout udaje na formulari
+        //pe_contractheaderid (asi uz delame)
+        //pe_accountid
+        //pe_contactid
+        //pe_finalcontractscore (uz take delame a zobrazujeme ho jen pri nejakych podminkach)
+
+        var Contract = Contract || {
+            Enums: {
+                DisplayViewName: {
+                    General: "General"
+                },
+                StatusCode: {
+                    Draft: 100000000,
+                    Negotiated: 100000001,
+                    Signed: 100000004,
+                    Terminated: 100000005,
+                    Finished: 2
+                },
+                ApprovalStatus:
+                {
+                    ForApproval: 100000000,
+                    Approved: 100000001,
+                    NotApproved: 100000002,
+                    Cancelled: 100000003,
+                },
+                ContractTermStatusCode: {
+                    Active: 1,
+                    Inactive: 2
+                }
+            },
+            CopyFromContract: null,
+            SourceProperty: "copyFromEntity",
+            Copy: function () {
+                var lookupForm = new MobileCRM.UI.LookupForm();
+                lookupForm.addView("account", "Default");
+                lookupForm.allowNull = false;
+                lookupForm.show(Contract.DoCopy, MobileCRM.bridge.alert, null);
+
+                
+            },
+            DoCopy: function (account) {
+                try {
+                    MobileCRM.UI.EntityForm.requestObject(function (entityForm) {
+                        LLP.SetExecutionContext(entityForm);
+                    
+                        var newEntity = new MobileCRM.DynamicEntity(entityForm.entity.entityName);
+                        newEntity = LLP.Entity.CopyProperties(entityForm.entity, newEntity);
+                        LLP.Common.SetAttributeValue(newEntity, "pe_accountid", new MobileCRM.Reference(account.entityName, account.id, account.primaryName));
+                        Contract.CopyFromContract = entityForm.entity.id;
+                        MobileCRM.UI.FormManager.showNewDialog(newEntity.entityName,
+                            new MobileCRM.Relationship(Contract.SourceProperty, new MobileCRM.Reference("pe_contract", entityForm.entity.id, entityForm.entity.primaryName)),
+                            {
+                                "@initialize": LLP.Form.GetInitDialogFieldsWithValues(["pe_contractheaderid", "pe_name", "pe_accountid", "pe_contactid"], newEntity)
+                            });
+                        MobileCRM.UI.EntityForm.closeWithoutSaving();
+                    });
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Contract, "DoCopy:", e);
+                }
+            },
+            RaiseGlobalEvent: function () {
+                var eventName = document.getElementById("txtGlobalEvent").value;
+                MobileCRM.bridge.raiseGlobalEvent(eventName, "test from contract");
+            },
+            GetContractTermsFromSourceContract: function(entityForm, copyFromContractId, suspendSaveHandler) {
+                var xml = '<fetch>\
+		                        <entity name="pe_contractterm">\
+                                <attribute name="pe_name" />\
+                                <attribute name="pe_termid" />\
+                                <attribute name="pe_number" />\
+                                <attribute name="pe_percent" />\
+		                        <order attribute="pe_name" descending="false" />\
+		                        <filter type="and">\
+			                        <condition attribute="pe_contractid" operator="eq" value="' + copyFromContractId + '" />\
+		                        </filter>\
+		                        </entity>\
+	                        </fetch>';
+
+                MobileCRM.FetchXml.Fetch.deserializeFromXml(xml, function (fetch) {
+                    fetch.execute("DynamicEntities", function (contractTerms) {
+                        Contract.SaveContractTermsFromSourceContract(entityForm, contractTerms, suspendSaveHandler);
+                    }, MobileCRM.bridge.alert);
+                }, MobileCRM.bridge.alert);
+            },
+            SaveContractTermsFromSourceContract: function (entityForm, contractTerms, suspendSaveHandler) {
+                try {
+                    var results = [];
+                
+                    for (var i = 0; i < contractTerms.length; i++) {
+                        var newContractTerm = new MobileCRM.DynamicEntity("pe_contractterm");
+                        LLP.Common.SetAttributeValue(newContractTerm, "pe_contractid", new MobileCRM.Reference(entityForm.entity.entityName, entityForm.entity.id, entityForm.entity.primaryName));
+                        LLP.Common.SetAttributeValue(newContractTerm, "pe_termid", LLP.Common.GetAttributeValue(contractTerms[i], "pe_termid"));
+                        LLP.Common.SetAttributeValue(newContractTerm, "pe_name", LLP.Common.GetAttributeValue(contractTerms[i], "pe_name"));
+                        LLP.Common.SetAttributeValue(newContractTerm, "pe_number", LLP.Common.GetAttributeValue(contractTerms[i], "pe_number"));
+                        LLP.Common.SetAttributeValue(newContractTerm, "pe_percent", LLP.Common.GetAttributeValue(contractTerms[i], "pe_percent"));
+                        var savedContractTerm = newContractTerm.save(function (err) {
+                            if (err) {
+                                LLP.LOG.Error(LLP.Enums.Module.Contract, "SaveContractTermsFromSourceContract -> callback: ", err);
+                                results.push(false);
+                            }
+                            else {
+                                results.push(true);
+                            }
+
+                            if (results.length == contractTerms.length) {
+                                suspendSaveHandler.resumePostSave();
+
+                                if (results.indexOf(false) >= 0) {
+                                    MobileCRM.bridge.alert("Some errors occured while saving Contract Terms");
+                                }
+                            }
+                        });
+                    }
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Contract, "SaveContractTermsFromSourceContract", e);
+                }
+            },
+            SetEditability: function() {
+                try {
+                    let pe_approvalstatus = LLP.Common.Attribute_GetValue(Contract.Enums.DisplayViewName.General, "pe_approvalstatus");
+                    let statuscode = LLP.Common.Attribute_GetValue(Contract.Enums.DisplayViewName.General, "statuscode");
+                    let pe_minimumofcontractismet = LLP.Common.Attribute_GetValue(Contract.Enums.DisplayViewName.General, "pe_minimumofcontractismet");
+                    let disabled = pe_approvalstatus && pe_approvalstatus != -1
+                    let buttonIds = ["btnNegotiated", "btnSigned", "btnFinished", "btnTerminated"];
+
+                    if (statuscode != Contract.Enums.StatusCode.Draft) {
+                        LLP.Form.Disabled();
+                    }
+                    else {
+                        let fields = ["pe_contractheaderid", "pe_accountid", "pe_contactid", "pe_payeraccountzadpid"];
+                        let alwaysDisabledFields = ["statuscode", "pe_finalcontractscore", "pe_creationinsfaallowed", "pe_porequestgeneration", "pe_sesrequestgeneration", "pe_minimumofcontractismet"];
+                        LLP.Common.Attribute_Disabled(Contract.Enums.DisplayViewName.General, "pe_approvalstatus");
+                        LLP.Common.Attribute_Required(Contract.Enums.DisplayViewName.General, "pe_payeraccountzadpid");
+
+                        for (let i = 0; i < fields.length; i++) {
+                            LLP.Common.Attribute_IsDisabled(Contract.Enums.DisplayViewName.General, fields[i], disabled);
+                        }
+
+                        for (let i = 0; i < alwaysDisabledFields.length; i++) {
+                            LLP.Common.Attribute_IsDisabled(Contract.Enums.DisplayViewName.General, alwaysDisabledFields[i], true);
+                        }
+                    }
+
+                    LLP.HtmlControl.SetDisabled("btnSendToApproval", !pe_minimumofcontractismet || disabled);
+                    let buttonDisabled = statuscode != Contract.Enums.StatusCode.Draft;
+                    for (let i = 0; i < buttonIds.length; i++) {
+                        LLP.HtmlControl.SetDisabled(buttonIds[i], buttonDisabled);
+                    }
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Contract, "SetEditability", e);
+                }
+            },
+            CheckContractTypeAttributes: function(contractHeader, accountRef, suspendSaveHandler) {
+                try {
+                    let pe_contracttypeRef = LLP.Common.GetAttributeValue(contractHeader, "pe_contracttypeid");
+                    if (pe_contracttypeRef) {
+                        MobileCRM.DynamicEntity.loadById(pe_contracttypeRef.entityName, pe_contracttypeRef.id, function (contractType) {
+
+                            MobileCRM.DynamicEntity.loadById(accountRef.entityName, accountRef.id, function (account) {
+                                MobileCRM.UI.EntityForm.requestObject(function (entityForm) {
+                                    LLP.SetExecutionContext(entityForm);
+                                    LLP.Common.Attribute_SetValue(Contract.Enums.DisplayViewName.General, "pe_creationinsfaallowed", LLP.Common.GetAttributeValue(contractType, "pe_creationinsfaallowed"));
+                                    LLP.Common.Attribute_SetValue(Contract.Enums.DisplayViewName.General, "pe_porequestgeneration", LLP.Common.GetAttributeValue(contractType, "pe_porequestgeneration"));
+                                    LLP.Common.Attribute_SetValue(Contract.Enums.DisplayViewName.General, "pe_sesrequestgeneration", LLP.Common.GetAttributeValue(contractType, "pe_sesrequestgeneration"));
+
+                                    //if() {
+
+                                    //}
+                                    //else {
+
+                                    //}
+
+                                    suspendSaveHandler.resumeSave();
+                                },
+                            function (error) {
+                                LLP.LOG.Error(LLP.Enums.Module.Contract, "CheckContractTypeAttributes -> MobileCRM.DynamicEntity.loadById failed -> MobileCRM.UI.EntityForm.requestObject", e);
+                            }, null);
+                            },
+                            function (error) {
+
+                            }, null);
+                        },
+                        function (error) {
+                            LLP.LOG.Error(LLP.Enums.Module.Contract, "CheckContractTypeAttributes -> MobileCRM.DynamicEntity.loadById failed", e);
+                        }, null);
+                    }
+                    else {
+                        suspendSaveHandler.resumeSave();
+                    }
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Contract, "CheckContractTypeAttributes", e);
+                }
+            },
+            OnClick_ChangeStatusCode: function(button) {
+                try {
+                    MobileCRM.UI.EntityForm.requestObject(function (entityForm) {
+                        LLP.SetExecutionContext(entityForm);
+                        let statusCode = null;
+                        switch(button.id)
+                        {
+                            case "btnSendToApproval":
+                                LLP.Common.Attribute_SetValue(Contract.Enums.DisplayViewName.General, "pe_approvalstatus", Contract.Enums.ApprovalStatus.ForApproval);
+                                break;
+                            case "btnNegotiated":
+                                statusCode = Contract.Enums.StatusCode.Negotiated;
+                                break;
+                            case "btnSigned":
+                                statusCode = Contract.Enums.StatusCode.Signed;
+                                break;
+                            case "btnFinished":
+                                statusCode = Contract.Enums.StatusCode.Finished;
+                                break;
+                            case "btnTerminated":
+                                statusCode = Contract.Enums.StatusCode.Terminated;
+                                break;
+                        }
+
+                        if (statusCode) {
+                            LLP.Common.Attribute_SetValue(Contract.Enums.DisplayViewName.General, "statuscode", statusCode);
+                        }
+
+                        MobileCRM.UI.EntityForm.save();
+                    },
+                    function (error) {
+                        LLP.LOG.Error(LLP.Enums.Module.Contract, "OnClick_ChangeStatusCode -> MobileCRM.UI.EntityForm.requestObject", errorMessage);
+                    }, null);
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Contract, "OnClick_ChangeStatusCode", errorMessage);
+                }
+            },
+            OnLoad: function () {
+                try
+                {
+                    MobileCRM.UI.EntityForm.onSave(Contract.OnSave, true, null);
+                    MobileCRM.UI.EntityForm.onPostSave(Contract.OnPostSave, true, null);
+                    MobileCRM.UI.EntityForm.requestObject(function (entityForm) {
+                        LLP.SetExecutionContext(entityForm);
+                        Contract.SetEditability();
+                        entityForm.setTabVisibility("Actions", !LLP.Form.IsCreate());
+                    });
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Contract, "OnLoad: ", e);
+                }
+            },
+            OnSave: function(entityForm) {
+                try {
+                    LLP.SetExecutionContext(entityForm);
+                    var contractHeader = null;
+
+                    if (LLP.Form.IsCreate() && (entityForm.relationship.sourceProperty == Contract.SourceProperty || entityForm.relationship.sourceProperty == "pe_contractheaderid")) {
+                        contractHeader = entityForm.relationship.target;
+                    }
+                    else {
+                        contractHeader = LLP.Common.Attribute_GetValue(Contract.Enums.DisplayViewName.General, "pe_contractheaderid");
+                    }
+
+                    var suspendSaveHandler = entityForm.suspendSave();
+
+                    var xml =
+                            '<fetch>\
+		                        <entity name="pe_contractterm">\
+                                    <attribute name="pe_contracttermid" />\
+		                            <filter type="and">\
+			                            <condition attribute="pe_contractid" operator="eq" value="' + entityForm.entity.id + '" />\
+                                        <condition attribute="statuscode" operator="eq" value="' + Contract.Enums.ContractTermStatusCode.Active + '" />\
+		                            </filter>\
+		                        </entity>\
+	                        </fetch>';
+
+                    MobileCRM.FetchXml.Fetch.deserializeFromXml(xml, function (fetch) {
+                        fetch.execute("DynamicEntities", function (activeContractTerms) {
+                            MobileCRM.DynamicEntity.loadById(contractHeader.entityName, contractHeader.id,
+                                function (result) {
+
+                                    var pe_accountid = LLP.Common.Attribute_GetValue(Contract.Enums.DisplayViewName.General, "pe_accountid");
+
+                                    var pe_contracttypeRef = LLP.Common.GetAttributeValue(entityForm.entity, "pe_contracttypeid");
+
+                                    if (!pe_contracttypeRef) {
+                                        pe_contracttypeRef = LLP.Common.GetAttributeValue(result, "pe_contracttypeid");
+                                    }
+
+                                    MobileCRM.DynamicEntity.loadById(pe_contracttypeRef.entityName, pe_contracttypeRef.id, function (contractType) {
+                                        MobileCRM.UI.EntityForm.requestObject(function (entityForm) {
+                                            LLP.Common.SetAttributeValue(entityForm.entity, "pe_contracttypeid", pe_contracttypeRef);
+                                            let pe_minimumcountofterms = LLP.Common.GetAttributeValue(contractType, "pe_minimumcountofterms");
+
+                                            //a) pe_contracttype.pe_minimumcountofterms >= pe_contract.(count of)[active rows Contract Terms]
+                                            let pe_minimumofcontractismet = pe_minimumcountofterms >= result.length
+                                            //TODO
+                                            //b) na pe_contract.pe_accountid jsou vyplnena pole - bude upresneno ktera, zatim tam dej treba name? :)
+                                            //c) budget - tohle bude upresneno nekdy daleko vic v budoucnu, b) budu mit v radu dnu
+
+                                            LLP.Common.SetAttributeValue(entityForm.entity, "pe_minimumofcontractismet", pe_minimumofcontractismet);
+
+                                            LLP.Common.SetAttributeValue(entityForm.entity, "pe_name", LLP.Common.GetAttributeValue(result, "pe_name") + " - " + pe_accountid.primaryName);
+                                            Contract.CheckContractTypeAttributes(result, pe_accountid, suspendSaveHandler);
+                                        },
+                                        function (error) {
+                                            LLP.LOG.Error(LLP.Enums.Module.Contract, "OnSave -> MobileCRM.DynamicEntity.loadById callback -> MobileCRM.UI.EntityForm.requestObject callback failed: ", error);
+                                        }, null);
+                                    },
+                                    function (error) {
+                                        LLP.LOG.Error(LLP.Enums.Module.Contract, "OnSave ", error);
+                                    }, null);
+                                },
+                                function (error) {
+                                    LLP.LOG.Error(LLP.Enums.Module.Contract, "OnSave -> MobileCRM.DynamicEntity.loadById callback failed: ", error);
+                                });
+                        }, MobileCRM.bridge.alert);
+                    }, MobileCRM.bridge.alert);
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Contract, "OnPostSave: ", e);
+                }
+            },
+            OnPostSave: function(entityForm) {
+                try {
+                    LLP.SetExecutionContext(entityForm);
+                    if (entityForm.relationship.sourceProperty == Contract.SourceProperty) {
+                        var suspendSaveHandler = entityForm.suspendPostSave();
+                        Contract.GetContractTermsFromSourceContract(entityForm, entityForm.relationship.target.id, suspendSaveHandler);
+                    }
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Contract, "OnPostSave: ", e);
+                }
+            }
+        }
+
+        window.onload = function () {
+            Contract.OnLoad();
+        }
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,291 @@
+﻿<!DOCTYPE html>
+
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="utf-8" />
+    <title>Empty Offline HTML page</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="initial-scale=1, user-scalable=no" />
+    <script src="..\Common\JSBridge.js"></script>
+    <script src="..\Common\pe_GlobalCommonFunctions.js"></script>
+</head>
+<body>
+    <script>
+        //********************************************************************************************************************
+        //Task 4857 |
+        //----------
+        //plati pro Resco i CRM
+
+        //na entite pe_contractheader
+        //je attribut lookup: pe_contracttypeid
+        //a attribut picklist: pe_contractsubtype
+
+        //pe_contractsubtype bude vzdy schovane pokud pe_contracttypeid nebude mit v sobe vybranou hodnotu: Bailment Contract
+        //pokud ano, tak pole pe_contractsubtype zobrazit a zpovinit jej
+        //********************************************************************************************************************
+        //Task 5111 |
+        //----------
+        //update: pouze v Resco
+        //----------
+        //potreboval bych na entite:
+        //    pe_contractheader
+        //predgenerovavat pole: pe_name = "Created On: pe_contractheader.createdon"
+        //(normalne textove + doplnit timestamp, jinak to pise nez se to syncne "unknown")
+        //********************************************************************************************************************
+        //Task 5113 |
+        //----------
+        //potreboval bych na entite: pe_contractheader
+        //skryvat a nastavovat povinnosti.
+        //1) zkontrolovat povinnost pole: pe_contractsubtype
+        //- toto pole se ma zobrazit pouze pokud je v lookupu pe_contracttypeid = Bailment Contract
+        //- prijde mi, ze pokud vyberu Bailment contract a pak jinou hodnotu, tak se pole schova, ale je stale nastavene jako povinne
+
+        //2) zakmnout vzdy: 
+        //    pe_contractnumber
+        //pe_totalvalue
+        //pe_approvalstatus
+
+        //3) filtrovat statuscode
+        //- zobrazit pouze: 1 (draft), 100 000 002 (to be approved)
+
+        //4) pokud statuscode = 100 000 002 (to be approved)
+        //zpovinnit pole: 
+        //        pe_validfrom
+        //        pe_validto
+        //********************************************************************************************************************
+        //Task 5112 |
+        //----------
+        //z minuleho tasku mame napocitano, jak dlouho smlouva trva.
+        //Ale pak zbytek je spatne :)
+        //==========
+        //upravil jsem datovou strukturu, pole:
+        //pe_totalvalue
+        //pe_monthlyvalue
+
+        //jsem odtranil a vytvoril znovu, ale jsou typu currency
+        //a to proto, ze:
+
+        //ty mas napocitanou delku smlouvy tu vynasobis s pe_contractheader.pe_monthlyvalue
+        //a tuto hodnotu ulozis do pole pe_contractheader.pe_totalvalue
+        //********************************************************************************************************************
+        //Task 5300 |
+        //----------
+        //6) contract header total odstraneny status reason, ponechat standard = protoze se approving presunul na Contract
+        //(active/active, inactive/inactive)
+        //- ale podle me jsem nikde nic neresili s Contract Header status
+
+        var ContractHeader = ContractHeader || {
+            ContractTypeName: "Bailment Contract",
+            AutonumberContractTypes: ["Bailment Contract", "KPWN", "KPWN DC", "KPWN in MT", "Local Chain Contract", "NKA Contract", "PICOS", "Season"],
+            Enums: {
+                // Detail view display name
+                DisplayName: {
+                    General: "General"
+                },
+                StatusCode: {
+                    Active: 1,
+                    Inactive: 2
+                }
+            },
+            AllowedStatusCodes: [1, 2],
+            CheckBailmentContract: function(entityForm) {
+                var pe_contracttypeid = LLP.Common.Attribute_GetValue(ContractHeader.Enums.DisplayName.General, "pe_contracttypeid");
+                if (!pe_contracttypeid) {
+                    LLP.Common.Attribute_Visibility(ContractHeader.Enums.DisplayName.General, "pe_contractsubtype", true);
+                    LLP.Common.Attribute_RequiredWithPossibleNullValue(ContractHeader.Enums.DisplayName.General, "pe_contractsubtype", -1);
+                    return;
+                }
+
+                MobileCRM.DynamicEntity.loadById("pe_contracttype", pe_contracttypeid.id, function (result) {
+                    MobileCRM.UI.EntityForm.requestObject(function (entityForm) {
+                        LLP.SetExecutionContext(entityForm);
+                        var name = LLP.Common.GetAttributeValue(result, "pe_name");
+                        var visible = name == ContractHeader.ContractTypeName;
+                        LLP.Common.Attribute_Visibility(ContractHeader.Enums.DisplayName.General, "pe_contractsubtype", visible);
+                        if (visible) {
+                            LLP.Common.Attribute_RequiredWithPossibleNullValue(ContractHeader.Enums.DisplayName.General, "pe_contractsubtype", -1);
+                        }
+                        else {
+                            LLP.Common.Attribute_SetValue(ContractHeader.Enums.DisplayName.General, "pe_contractsubtype", -1);
+                            LLP.Common.Attribute_NonRequired(ContractHeader.Enums.DisplayName.General, "pe_contractsubtype");
+                        }
+
+                        if (LLP.Form.IsCreate()) {
+                            let contractNumberDisabled = ContractHeader.AutonumberContractTypes.indexOf(name) >= 0;
+                            LLP.Common.Attribute_IsDisabled(ContractHeader.Enums.DisplayName.General, "pe_contractnumber", contractNumberDisabled);
+                            if (contractNumberDisabled) {
+                                LLP.Common.Attribute_SetValue(ContractHeader.Enums.DisplayName.General, "pe_contractnumber", null);
+                            }
+                        }
+                    });
+                },
+                function (error) {
+                    LLP.LOG.Error(LLP.Enums.Module.ContractHeader, "CheckBailmentContract: ", error);
+                },
+                null);
+            },
+            FilterStatusCode: function(entityForm) {
+                try {
+                    MobileCRM.Metadata.getOptionSetValues(
+                                        "pe_contractheader",
+                                        "statuscode",
+                                        function (optionSetValues) {
+                                            var names = Object.getOwnPropertyNames(optionSetValues);
+                                            var filtered = {};
+
+                                            for (var i = 0; i < names.length; i++) {
+                                                if (ContractHeader.AllowedStatusCodes.indexOf(optionSetValues[names[i]]) >= 0) {
+                                                    filtered[names[i]] = optionSetValues[names[i]];
+                                                }
+                                            }
+
+                                            var detailView = entityForm.getDetailView(ContractHeader.Enums.DisplayName.General);
+                                            var itemIndex = detailView.getItemIndex("statuscode");
+                                            if (itemIndex >= 0) {
+                                                var filteredNames = Object.getOwnPropertyNames(filtered);
+                                                detailView.updateComboItemDataSource(itemIndex, filtered, "int", filtered[filteredNames[0]]);
+                                            }
+                                        },
+                                        function (error) {
+                                            LLP.LOG.Error(LLP.Enums.Module.ContractHeader, "FilterStatusCodes -> MobileCRM.Metadata.getOptionSetValues callback:", error);
+                                        }, null);
+
+
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.ContractHeader, "RetrievePromotionTypeOptions:", e);
+                }
+            },
+            OnChange_ContractType: function (entityForm) {
+                try
+                {
+                    LLP.SetExecutionContext(entityForm);
+                    ContractHeader.CheckBailmentContract(entityForm);
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.ContractHeader, "OnChange_ContractType: ", error);
+                }
+            },
+            OnLoad: function () {
+                try
+                {
+                    MobileCRM.UI.EntityForm.requestObject(function (entityForm) {
+                        LLP.SetExecutionContext(entityForm);
+                        ContractHeader.FilterStatusCode(entityForm);
+                        ContractHeader.CheckBailmentContract(entityForm);
+
+                        LLP.Common.Attribute_Disabled(ContractHeader.Enums.DisplayName.General, "pe_totalvalue");
+
+                        //c) kdyz ulozim zaznam zamknout vzdy:
+                        //pe_contractnumber
+                        //pe_monthlyvalue
+                        //pe_validfrom
+                        //pe_validto
+                        //pe_totalvalue
+                        let disabled = !LLP.Form.IsCreate();
+                        LLP.Common.Attribute_IsDisabled(ContractHeader.Enums.DisplayName.General, "pe_contractnumber", disabled);
+                        LLP.Common.Attribute_IsDisabled(ContractHeader.Enums.DisplayName.General, "pe_monthlyvalue", disabled);
+                        LLP.Common.Attribute_IsDisabled(ContractHeader.Enums.DisplayName.General, "pe_validfrom", disabled);
+                        LLP.Common.Attribute_IsDisabled(ContractHeader.Enums.DisplayName.General, "pe_validto", disabled);
+                        
+                        LLP.Common.Attribute_IsRequired(ContractHeader.Enums.DisplayName.General, "pe_validfrom", true);
+                        LLP.Common.Attribute_IsRequired(ContractHeader.Enums.DisplayName.General, "pe_validto", true);
+                        LLP.Common.Attribute_IsRequired(ContractHeader.Enums.DisplayName.General, "pe_contracttypeid", true);
+                        LLP.Common.Attribute_IsRequired(ContractHeader.Enums.DisplayName.General, "pe_monthlyvalue", true);
+                        
+                    });
+                    MobileCRM.UI.EntityForm.onItemChange("pe_contracttypeid", ContractHeader.OnChange_ContractType, true, null);
+                    MobileCRM.UI.EntityForm.onSave(ContractHeader.OnSave, true, null);
+                    MobileCRM.UI.EntityForm.onPostSave(ContractHeader.OnPostSave, true, null);
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.ContractHeader, "OnLoad: ", e);
+                }
+            },
+            OnSave: function(entityForm) {
+                try
+                {
+                    LLP.SetExecutionContext(entityForm);
+
+                    var pe_validfrom = LLP.Common.Attribute_GetValue(ContractHeader.Enums.DisplayName.General, "pe_validfrom");
+                    var pe_validto = LLP.Common.Attribute_GetValue(ContractHeader.Enums.DisplayName.General, "pe_validto");
+                    var currentDate = new Date();
+
+                    if(pe_validfrom && pe_validto) {
+                        var years = pe_validto.getYear() - pe_validfrom.getYear();
+                        var months = years * 12 + pe_validto.getMonth() - pe_validfrom.getMonth() + 1;
+                        var pe_monthlyvalue = LLP.Common.Attribute_GetValue(ContractHeader.Enums.DisplayName.General, "pe_monthlyvalue");
+                        LLP.Common.Attribute_SetValue(ContractHeader.Enums.DisplayName.General, "pe_totalvalue", months * pe_monthlyvalue);
+                    }
+                    else {
+                        LLP.Common.Attribute_SetValue(ContractHeader.Enums.DisplayName.General, "pe_totalvalue", null);
+                    }
+                    LLP.Common.SetAttributeValue(entityForm.entity, "pe_name", "Created On: " + currentDate.toLocaleString())
+
+                    var pe_masteraccountid = LLP.Common.GetAttributeValue(entityForm.entity, "pe_masteraccountid");
+                    if (!pe_masteraccountid && entityForm.relationship.target) {
+                        LLP.Common.SetAttributeValue(entityForm.entity, "pe_masteraccountid", LLP.Common.GetAttributeValue(entityForm.relationship.target, "pe_accountid"));
+                    }
+                }
+                catch(e) {
+                    LLP.LOG.Error(LLP.Enums.Module.ContractHeader, "OnSave: ", e);
+                }
+            },
+            OnPostSave: function (entityForm) {
+                try {
+
+                    var postSaveHandler = entityForm.suspendPostSave();
+                    var pe_masteraccountid = LLP.Common.GetAttributeValue(entityForm.entity, "pe_masteraccountid");
+
+                    if (pe_masteraccountid) {
+
+                        var fetchLastCampaignExecutionProducts =
+                                            '<fetch>\
+		                                        <entity name="pe_contractheaderaccount">\
+                                                    <attribute name="pe_contractheaderaccountid" />\
+                                                    <filter type="and">\
+			                                            <condition attribute="pe_contractheaderid" operator="eq" value="' + entityForm.entity.id + '" />\
+                                                        <condition attribute="pe_accountid" operator="eq" value="' + pe_masteraccountid.id + '" />\
+		                                            </filter>\
+		                                        </entity>\
+	                                        </fetch>';
+
+                        MobileCRM.FetchXml.Fetch.deserializeFromXml(fetchLastCampaignExecutionProducts, function (fetch) {
+                            fetch.execute("DynamicEntities", function (result) {
+                                if (result.length == 0) {
+                                    var pe_contractheaderaccount = new MobileCRM.DynamicEntity.createNew("pe_contractheaderaccount");
+                                    LLP.Common.SetAttributeValue(pe_contractheaderaccount, "pe_contractheaderid", new MobileCRM.Reference(entityForm.entity.entityName, entityForm.entity.id, entityForm.entity.primaryName));
+                                    LLP.Common.SetAttributeValue(pe_contractheaderaccount, "pe_accountid", new MobileCRM.Reference(pe_masteraccountid.entityName, pe_masteraccountid.id, pe_masteraccountid.primaryName));
+                                    pe_contractheaderaccount.save(function (err) {
+                                        if (err) {
+                                            LLP.LOG.Error(LLP.Enums.Module.ContractHeader, "OnPostSave -> create pe_contractheaderaccount error: ", err);
+                                            postSaveHandler.resumePostSave(err);
+                                        }
+                                        else {
+                                            postSaveHandler.resumePostSave();
+                                        }
+                                    }, null);
+                                }
+                                else {
+                                    postSaveHandler.resumePostSave();
+                                }
+                            }, MobileCRM.bridge.alert);
+                        }, MobileCRM.bridge.alert);
+                    }
+                    else {
+                        postSaveHandler.resumePostSave();
+                    }
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.ContractHeader, "OnPostSave: ", e);
+                }
+            }
+        }
+
+        window.onload = function () {
+            ContractHeader.OnLoad();
+        }
+
+    </script>
+</body>
+</html>

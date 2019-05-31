@@ -1,0 +1,92 @@
+﻿<!DOCTYPE html>
+
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="utf-8" />
+    <title>Empty Offline HTML page</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="initial-scale=1, user-scalable=no" />
+    <script src="..\Common\JSBridge.js"></script>
+    <script src="..\Common\pe_GlobalCommonFunctions.js"></script>
+</head>
+<body>
+    <script>
+
+        //Task 5224
+        //Resco
+        //--------
+        //entita pe_orderproduct
+        //--------
+
+        //1) zmena nazvu souboru:
+        //ProductOrder -> ProductOrderAllProducts
+        //OrderProductRow.html -> OrderProductAllProductsRow.html
+        //pridan novy soubor: 
+        //OrderProductPriceCheck.html
+        //OrderProductPriceCheckRow.html
+
+        //2) na entite pe_orderproduct, formular Order Product - Price Check nastavit:
+        //#readonly:
+        //pe_pricechecklastprice
+        //pe_productid
+
+        //#povinne pole + editovatelne: pe_currentprice
+        //pokud: 
+        //pe_pricecheck == true
+        //pe_orderid.pe_pricecheckstatusreason == 100 000 002 (Active)
+        //pe_quantityinstock > 0
+
+        //#NEpovinne pole + editovatelne: pe_currentprice
+        //pe_pricecheck == true
+        //pe_quantityinstock > 0
+
+        //#readonly: pe_currentprice
+        //- pokud horni podminky nejsou splneny
+
+        //3) pripojen dalsi HTML na view: Order Products – Price Check
+        //- je potreba zaridit aby pole pe_currentprice
+        //bylo editovatelne pouze pri splneni podminek viz bod 2, jen rozdeleno na 2 html
+
+        var OrderProductPriceCheckRow = OrderProductPriceCheckRow || {
+            Enums: {
+                OrderStatusCode: {
+                    Completed: 690970001
+                }
+            },
+            CheckOrderStatusCode: function (statusCode) {
+                try {
+                    if (statusCode == OrderProductPriceCheckRow.Enums.OrderStatusCode.Completed) {
+                        MobileCRM.UI.EntityList.selectView("Order Products – Price Check – Read Only");
+                    }
+                    else {
+                        MobileCRM.UI.EntityList.selectView("Order Products – Price Check");
+                    }
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.OrderProductPriceCheckRow, "CheckOrderStatusCode", e);
+                }
+            },
+            OnLoad: function () {
+                try
+                {
+                    MobileCRM.UI.EntityList.requestObject(function (entityList) {
+                        var statucode = LLP.Common.GetAttributeValue(entityList.relationship.target, "statuscode");
+                        OrderProductPriceCheckRow.CheckOrderStatusCode(statucode);
+                    },
+                    function (error) {
+                        LLP.LOG.Error(LLP.Enums.Module.OrderProductPriceCheckRow, "OnLoad -> MobileCRM.UI.EntityList.requestObject", error);
+                    }, null);
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.OrderProductPriceCheckRow, "OnLoad: ", e);
+                }
+            }
+        }
+
+        window.onload = function () {
+            OrderProductPriceCheckRow.OnLoad();
+        }
+
+    </script>
+</body>
+</html>

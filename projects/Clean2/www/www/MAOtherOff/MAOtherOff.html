@@ -1,0 +1,172 @@
+﻿<!DOCTYPE html>
+
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="utf-8" />
+    <title>Empty Offline HTML page</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="initial-scale=1, user-scalable=no" />
+    <script src="..\Common\JSBridge.js"></script>
+    <script src="..\Common\pe_GlobalCommonFunctions.js"></script>
+    <script src="..\Common\jquery-3.3.1.min.js"></script>
+    <script src="..\Common\popper.min.js"></script>
+    <script src="..\Common\bootstrap.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="..\Common\bootstrap.min.css">
+</head>
+<body>
+
+    <div class="container mt-1">
+        <div class="row">
+            <button id="btnSave" class="btn btn-primary btn-block" onclick="MAOtherOff.OnClick_Save();">Save</button>
+        </div>
+        <div class="row mt-2">
+            <button id="btnCompleted" class="btn btn-primary btn-block" onclick="MAOtherOff.OnClick_Completed();">Completed</button>
+        </div>
+    </div>
+    
+
+    <script>
+
+        var MAOtherOff = MAOtherOff || {
+            Enums: {
+                // Detail view display name
+                DisplayViewName: {
+                    General: "General"
+                },
+                StatusCode: {
+                    Active: 1,
+                    Completed: 100000000,
+                    Inactive: 2
+                }
+            },
+            SetToCompleted: false,
+            SetEditability: function (entityForm)
+            {
+                try {
+                    var disabled = false;
+                    if (LLP.Common.GetAttributeValue(entityForm.entity, "statuscode") == MAOtherOff.Enums.StatusCode.Completed) {
+                        LLP.Form.Disabled();
+                        LLP.HtmlControl.SetDisabled("btnSave", true);
+                        LLP.HtmlControl.SetDisabled("btnCompleted", true);
+                    }
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.MAOtherOff, "SetEditability", e);
+                }
+            },
+            SetCompleted: function (entity)
+            {
+                LLP.Common.SetAttributeValue(entity, "statuscode", MAOtherOff.Enums.StatusCode.Completed);
+            },
+            OnClick_Save: function ()
+            {
+                try {
+                    MobileCRM.UI.EntityForm.save();
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.MAOtherOff, "Save", e);
+                }
+            },
+            OnClick_Completed: function ()
+            {
+                try {
+                    MobileCRM.UI.EntityForm.requestObject(function (entityForm)
+                    {
+                        MAOtherOff.SetToCompleted = true;
+
+                        if (!entityForm.isDirty) {
+                            MAOtherOff.SetCompleted(entityForm.entity);
+                        }
+
+                        MobileCRM.UI.EntityForm.save();
+                    },
+                    function (error)
+                    {
+                        LLP.LOG.Error(LLP.Enums.Module.MAOtherOff, "Completed -> MobileCRM.UI.EntityForm.requestObject", error);
+                    }, null);
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.MAOtherOff, "Completed", e);
+                }
+            },
+            OnLoad: function ()
+            {
+                try {
+                    MobileCRM.UI.EntityForm.onSave(MAOtherOff.OnSave, true, null);
+                    MobileCRM.UI.EntityForm.onPostSave(MAOtherOff.OnPostSave, true, null);
+                    MobileCRM.UI.EntityForm.requestObject(function (entityForm)
+                    {
+                        LLP.SetExecutionContext(entityForm);
+                        MAOtherOff.SetEditability(entityForm);
+                    });
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.MAOtherOff, "OnLoad: ", e);
+                }
+            },
+
+            OnSave: function (entityForm)
+            {
+                try {
+                    if (MAOtherOff.SetToCompleted) {
+                        MAOtherOff.SetCompleted(entityForm.entity);
+                    }
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.MAOtherOff, "OnSave", e);
+                }
+            },
+
+            OnPostSave: function (entityForm)
+            {
+                try {
+                    MAOtherOff.UpdateVisitActivity(MAOtherOff.SetToCompleted, entityForm.entity)
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.MAOtherOff, "OnPostSave", e);
+                }
+            },
+
+
+            UpdateVisitActivity: function (setToCompleted, entity)
+            {
+                try {
+                    var entityRef = new MobileCRM.Reference(entity.entityName, entity.id, entity.primaryName);
+                    var pe_VisitActivityRef = LLP.Common.GetAttributeValue(entity, "pe_visitactivityid");
+                    var pe_visitactivityEdit = new MobileCRM.DynamicEntity.createNew("pe_visitactivity");
+                    pe_visitactivityEdit.isNew = false;
+                    pe_visitactivityEdit.id = pe_VisitActivityRef.id;
+
+                    if (setToCompleted) {
+                        LLP.Common.SetAttributeValue(pe_visitactivityEdit, "pe_lastrun", new Date());
+                        LLP.Common.SetAttributeValue(pe_visitactivityEdit, "statuscode", 100000000); // completed
+                    }
+
+                    LLP.Common.SetAttributeValue(pe_visitactivityEdit, "pe_maotheroffid", entityRef);
+
+                    pe_visitactivityEdit.save(
+                         function (err)
+                         {
+                             if (err) {
+                                 LLP.LOG.Error(LLP.Enums.Module.MAOtherOff, "Error Save pe_visitactivityEdit -> callback: ", err);
+                             }
+                         }
+                    );
+
+
+                } catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.MAOtherOff, "OnPostSave", e);
+                }
+
+            }
+
+
+        }
+
+    window.onload = function () {
+        MAOtherOff.OnLoad();
+    }
+
+    </script>
+</body>
+</html>

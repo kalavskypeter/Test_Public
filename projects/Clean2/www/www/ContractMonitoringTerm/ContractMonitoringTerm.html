@@ -1,0 +1,161 @@
+﻿<!DOCTYPE html>
+
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="utf-8" />
+    <title>Empty Offline HTML page</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="initial-scale=1, user-scalable=no" />
+    <script src="..\Common\JSBridge.js"></script>
+    <script src="..\Common\pe_GlobalCommonFunctions.js"></script>
+</head>
+<body onload="ContractMonitoringTerm.OnLoad();">
+    <label id="logLabel"></label>
+    <script>
+        //Task 4885
+        //podobny task jako 4880, spojeny mozna s taskem 4884
+
+        //-akorat se bude jednat o entitu Contract Monitoring Term (pe_contractmonitoringterm)
+        // - pri generovani radku, se podivat na zdrojovou entitu "pe_term" a vycist z ni nastaveni:
+        //pokud Field Type (option set) bude mit hodnotu:
+        //number -> zobrazit (na pe_contractterm) pe_number
+        //read only a percent->zobrazit pe_boolean
+        //***********************************************************************************
+        //Task 5246 |
+        //----------
+        //Resco
+        //---
+        //vznikly 2 nove atrb:
+        //pe_lastnumber
+        //pe_lastboolean 
+
+        //tyto attb nastavit vzdy jen pro cteni
+        //***********************************************************************************
+        //Task 5245 |
+        //----------
+        //Resco
+        //---
+        //vznikly dva logicky stejne attb:
+        //    pe_lastnumber
+        //pe_lastboolean 
+        //=========
+        //- jsou pouze pro historicke zobrazeni, je potreba na nich udelat stejnou logiku:
+        //    - pokud Term == number, zobrazit pe_lastnumber
+        //    - pokud Term == boolean, zobrazit pe_lastboolean
+
+        var ContractMonitoringTerm = ContractMonitoringTerm || {
+            ContractTerms: null,
+            Enums: {
+                // Detail view display name
+                DisplayName: {
+                    General: "General"
+                },
+                FieldType: {
+                    Number: 100000000,
+                    ReadOnly: 100000001,
+                    Percent: 100000002
+                },
+                CMStatusCode:
+                {
+                    Completed: 1,
+                    Draft: 100000000,
+                    Cancelled: 100000001,
+                    Inactive: 2
+                },
+            },
+            GetTerm: function (entity) {
+                try {
+                    var pe_contracttermRef = LLP.Common.GetAttributeValue(entity, "pe_contracttermid");
+
+                    var xml =
+                            '<fetch>\
+		                        <entity name="pe_contractterm">\
+                                <filter type="and">\
+			                        <condition attribute="pe_contracttermid" operator="eq" value="' + pe_contracttermRef.id + '" />\
+		                        </filter>\
+                                <link-entity name="pe_term" from="pe_termid" to="pe_termid" alias="term">\
+                                    <attribute name="pe_fieldtype" />\
+                                </link-entity>\
+		                        </entity>\
+	                        </fetch>';
+
+                    MobileCRM.FetchXml.Fetch.deserializeFromXml(xml, function (fetch) {
+                        fetch.execute("DynamicEntities", function (terms) {
+                            if (terms.length > 0) {
+                                MobileCRM.UI.EntityForm.requestObject(function (entityForm) {
+                                    LLP.SetExecutionContext(entityForm);
+                                    for (var i = 0; i < terms.length; i++) {
+                                        switch (LLP.Common.GetAttributeValue(terms[i], "term.pe_fieldtype")) {
+                                            case ContractMonitoringTerm.Enums.FieldType.Number:
+                                                LLP.Common.Attribute_Visible(ContractMonitoringTerm.Enums.DisplayName.General, "pe_number");
+                                                LLP.Common.Attribute_Visible(ContractMonitoringTerm.Enums.DisplayName.General, "pe_lastnumber");
+                                                break;
+                                            default:
+                                                LLP.Common.Attribute_Visible(ContractMonitoringTerm.Enums.DisplayName.General, "pe_boolean");
+                                                LLP.Common.Attribute_Visible(ContractMonitoringTerm.Enums.DisplayName.General, "pe_lastboolean");
+                                                break;
+                                        }
+                                    }
+                                },
+                                function (error) {
+                                }, null);
+                            }
+                        }, MobileCRM.bridge.alert);
+                    }, MobileCRM.bridge.alert);
+                } catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.ContractMonitoringTerm, "GetTerm", e);
+                }
+            },
+            // ON LOAD FORM
+            OnLoad: function () {
+                try {
+                    MobileCRM.UI.EntityForm.requestObject(
+                        function (entityForm) {
+                            try {
+                                
+                                LLP.SetExecutionContext(entityForm);
+
+                                if (!LLP.Form.IsCreate()) {
+                                    ContractMonitoringTerm.GetTerm(entityForm.entity);
+                                }
+
+                                LLP.Common.Attribute_Invisible(ContractMonitoringTerm.Enums.DisplayName.General, "pe_number");
+                                LLP.Common.Attribute_Invisible(ContractMonitoringTerm.Enums.DisplayName.General, "pe_boolean");
+                                LLP.Common.Attribute_Invisible(ContractMonitoringTerm.Enums.DisplayName.General, "pe_lastnumber");
+                                LLP.Common.Attribute_Invisible(ContractMonitoringTerm.Enums.DisplayName.General, "pe_lastboolean");
+                                LLP.Common.Attribute_Disabled(ContractMonitoringTerm.Enums.DisplayName.General, "pe_lastnumber");
+                                LLP.Common.Attribute_Disabled(ContractMonitoringTerm.Enums.DisplayName.General, "pe_lastboolean");
+
+                                LLP.Fetch.IsAttributeValue(LLP.Common.GetAttributeValue(entityForm.entity, "pe_contractmonitoringid"), "statuscode", ContractMonitoringTerm.Enums.CMStatusCode.Completed, function (isSet) {
+
+                                    MobileCRM.UI.EntityForm.requestObject(function (entityForm) {
+                                        LLP.SetExecutionContext(entityForm);
+                                        if (isSet) {
+                                            LLP.Form.Disabled();
+                                        } else {
+                                            LLP.Common.Attribute_Enabled(ContractMonitoringTerm.Enums.DisplayName.General, "pe_number");
+                                            LLP.Common.Attribute_Enabled(ContractMonitoringTerm.Enums.DisplayName.General, "pe_boolean");
+                                        }
+                                    },
+                                    function (error) {
+                                        LLP.LOG.Error(LLP.Enums.Module.InventoryCheckLine, "OnLoad -> LLP.Fetch.IsAttributeValue -> callback -> MobileCRM.UI.EntityForm.requestObject", e);
+                                    }, null);
+
+                                });
+                            } catch (e) {
+                                LLP.LOG.Error(LLP.Enums.Module.ContractMonitoringTerm, "OnLoad -> MobileCRM.UI.EntityForm.requestObject -> callback:", e);
+                            }
+                        },
+                        function (errorMessage) {
+                            LLP.LOG.Error(LLP.Enums.Module.ContractMonitoringTerm, "OnLoad -> MobileCRM.UI.EntityForm.requestObject:", errorMessage);
+                        }
+                    );
+                } catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.ContractMonitoringTerm, "OnLoad:", e);
+                }
+            }
+        };
+    </script>
+
+</body>
+</html>

@@ -1,0 +1,349 @@
+﻿<!DOCTYPE html>
+
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="utf-8" />
+    <title>Empty Offline HTML page</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="initial-scale=1, user-scalable=no" />
+    <script src="..\Common\JSBridge.js"></script>
+    <script src="..\Common\pe_GlobalCommonFunctions.js"></script>
+</head>
+<body>
+    <label id="logLabel"></label>
+    <script>
+
+        // Task 4820
+        // Resco povinnosti:
+        //     - pokud vzniká ručně řádka, musí být vyplněny pole
+        //     (automaticky generované budeme muset možná nějak kompletne disablovat - ale nemam potvrzeno, udelali bychom to asi nejakym booleanem na radku)
+        // pe_customerassetid nebo pe_productid
+        // a zaroven pole pe_quantity
+        //**************************************************************************************************************************
+        //Task 5098
+        //potreboval bych na entite pe_inventorycheckline nastavovat povinnost pole pe_note podle hodnoty v 
+
+        //pokud bude pe_inventorycheckline.statuscode
+        //Theft - 100 000 000
+        //Moved - 100 000 002
+        //Found - 100 000 005
+        //Lost - 100 000 006
+        //nastavit pe_inventorycheckline.pe_note jako povinny
+
+        //pokud pe_inventorycheckline.statuscode
+        //To be checked  - 1
+        //Damaged in Outlet - 100 000 001
+        //Lacerny - 100 000 003
+        //Rebranding - 100 000 004
+        //OK - 100 000 007
+        //nastavit pe_inventorycheckline.pe_note jako nepovinny
+        //**************************************************************************************************************************
+        //Task 5100
+        //trochu spolecny s 5099 = kdyz resim, zda Inventory Check Line je nova radka
+
+        //pridavam uplne novou radku (=nasel jsem nejakou zidli, kterou u nich nemame evidovanou)
+        //- zde tim padem nebudeme vedet hodnotu pe_originalquantity a nemuzeme provadet kontrolu nize
+        //- ze se jedna o novy radek se pozna tak, ze nebude mit vyplneny lookup na pe_customerassetid nebo na pe_productid
+
+        //tady potrebuji pole pe_originalquantity schovat
+        //pokud se nebude jednat o novou radku, toto pole zas zobrazit a natavit jen pro cteni
+
+        var InventoryCheckLine = InventoryCheckLine || {
+            Assets: null,
+            CustomerAssetIsChanging: false,
+            ProductIsChanging: false,
+            Enums: {
+                // Detail view display name
+                DisplayName: {
+                    General: "General"
+                }
+                ,
+                StateCode: {
+                    Active: 0,
+                    InActive:1
+                },
+
+                StatusCode: {
+                    ToBeChecked: 1,             // Active[0]
+                    Inactive: 2,                // Inactive[1]
+                    Theft: 100000000,           // Active[0]
+                    DamagedInOutlet: 100000001, // Active[0]
+                    Moved: 100000002,           // Active[0]
+                    Larceny:100000003,          // Active[0]
+                    Rebranding: 100000004,      // Active[0]
+                    Found: 100000005,           // Active[0]
+                    Lost: 100000006,            // Active[0]
+                    OK: 100000007,              // Active[0]
+                },
+                InventoryCheckStatusCode: {
+                    Completed: 100000000
+                }
+            },
+            AllowedStatusCodesForIsCreate: [100000002, 100000004, 100000005],
+            AllowedStatusCodesForQuantityEqual: [100000007],
+            AllowedStatusCodesForQuantityGreaterThan: [100000002, 100000004, 100000005],
+            AllowedStatusCodesForQuantityLessThan: [100000000, 100000001, 100000002, 100000003, 100000004, 100000006],
+            OnChange_CustommerAsset: function (entityForm) {
+                try {
+                    LLP.SetExecutionContext(entityForm);
+                    if (InventoryCheckLine.ProductIsChanging) {
+                        InventoryCheckLine.ProductIsChanging = false;
+                    }
+                    else {
+                        LLP.SetExecutionContext(entityForm);
+
+                        var pe_customerassetid = LLP.Common.Attribute_GetValue(InventoryCheckLine.Enums.DisplayName.General, "pe_customerassetid");
+                        var pe_productid = LLP.Common.Attribute_GetValue(InventoryCheckLine.Enums.DisplayName.General, "pe_productid");
+
+                        if (pe_productid) {
+                            InventoryCheckLine.CustomerAssetIsChanging = true;
+                        }
+
+                        InventoryCheckLine.CheckIsRequired(pe_customerassetid, pe_productid);
+                    }
+                } catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.InventoryCheckLine, "OnChange_CustommerAsset:", e);
+                }
+            },
+            OnChange_Product: function (entityForm) {
+
+                try {
+                    LLP.SetExecutionContext(entityForm);
+                    if (InventoryCheckLine.CustomerAssetIsChanging) {
+                        InventoryCheckLine.CustomerAssetIsChanging = false;
+                    }
+                    else {
+
+                        LLP.SetExecutionContext(entityForm);
+
+                        var pe_customerassetid = LLP.Common.Attribute_GetValue(InventoryCheckLine.Enums.DisplayName.General, "pe_customerassetid");
+                        var pe_productid = LLP.Common.Attribute_GetValue(InventoryCheckLine.Enums.DisplayName.General, "pe_productid");
+
+                        if (pe_customerassetid) {
+                            InventoryCheckLine.ProductIsChanging = true;
+                        }
+
+                        InventoryCheckLine.CheckIsRequired(pe_customerassetid, pe_productid);
+                    }
+                } catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.InventoryCheckLine, "OnChange_Product:", e);
+                }
+            },
+            OnChange_StatusCode: function(entityForm) {
+                LLP.SetExecutionContext(entityForm);
+                InventoryCheckLine.CheckStatusCode();
+            },
+            OnChange_Quantity: function (entityForm) {
+                LLP.SetExecutionContext(entityForm);
+                InventoryCheckLine.FilterStatusCodes();
+            },
+            FilteredPickList: function()
+            {
+                MobileCRM.UI.EntityForm.requestObject(
+                  function (entityForm)
+                  {
+                      LLP.SetExecutionContext(entityForm);
+                      var statecode = LLP.Common.GetAttributeValue(entityForm.entity, "statecode");
+                      if (statecode == InventoryCheckLine.Enums.StateCode.Active)
+                      {
+                          var statusCodeValue = LLP.Common.Attribute_GetValue(InventoryCheckLine.Enums.DisplayName.General, "statuscode");
+                          // odfiltruj neaktivni stav
+                          var optionListValue = InventoryCheckLine.GetListOptions(entityForm.entity.entityName, "statuscode");
+                          var detailView = entityForm.getDetailView("General");
+
+                          var filteredListValue = {};
+                          for (var item in optionListValue)
+                          {
+                              if (optionListValue[item] != InventoryCheckLine.Enums.StatusCode.Inactive)
+                              {
+                                  filteredListValue[item] = optionListValue[item];
+                              }
+                          }
+
+                          var itemIndex = detailView.getItemIndex("statuscode");
+                          detailView.updateComboItemDataSource(itemIndex, filteredListValue, "int", statusCodeValue);
+                      }
+                  }
+                  ,
+                  function (errorMessage)
+                  {
+                      LLP.LOG.Error(LLP.Enums.Module.InventoryCheckLine, "FilteredPickList.requestObject:", errorMessage);
+                  });
+
+            },
+
+            GetListOptions: function (entityName, propertyName)
+            {
+                
+                var result = {};
+                var listOptions = MobileCRM.Metadata.getStringListOptions(entityName, propertyName);
+                var searchVal = entityName + '.' + propertyName + '.';
+                var searchValLen = searchVal.length;
+                for (var i in MobileCRM.Localization.stringTable) {
+                    if (i && i.substr(0, searchValLen) == searchVal) {
+                        var val = parseInt(i.substr(searchValLen), 10);
+                        if (val > 0) {
+                            var st = MobileCRM.Localization.stringTable[i];
+                            result[st] = val;
+                        }
+                    }
+                }
+                return result;
+            },
+            CheckIsRequired: function (pe_customerassetid, pe_productid) {
+                if (LLP.Common.IsNullOrEmpty(pe_productid) && LLP.Common.IsNullOrEmpty(pe_customerassetid)) {
+                    LLP.Common.Attribute_Required(InventoryCheckLine.Enums.DisplayName.General, "pe_customerassetid");
+                    LLP.Common.Attribute_Required(InventoryCheckLine.Enums.DisplayName.General, "pe_productid");
+                }
+                else {
+                    LLP.Common.Attribute_NonRequired(InventoryCheckLine.Enums.DisplayName.General, "pe_customerassetid");
+                    LLP.Common.Attribute_NonRequired(InventoryCheckLine.Enums.DisplayName.General, "pe_productid");
+                }
+            },
+            CheckOriginalQuantityField: function (pe_customerassetid, pe_productid) {
+                var isVisible = true;
+
+                if (!pe_customerassetid && !pe_productid) {
+                    isVisible = false;
+                }
+
+                LLP.Common.Attribute_Visibility(InventoryCheckLine.Enums.DisplayName.General, "pe_originalquantity", isVisible);
+                LLP.Common.Attribute_Disabled(InventoryCheckLine.Enums.DisplayName.General, "pe_originalquantity");
+            },
+            FilterStatusCodes: function() {
+                try {
+                    MobileCRM.Metadata.getOptionSetValues(
+                                    "pe_inventorycheckline",
+                                    "statuscode",
+                                    function (optionSetValues) {
+
+                                        MobileCRM.UI.EntityForm.requestObject(function (entityForm) {
+                                            var filtered = {};
+
+                                            var names = Object.getOwnPropertyNames(optionSetValues);
+                                            var quantity = LLP.Common.Attribute_GetValue(InventoryCheckLine.Enums.DisplayName.General, "pe_quantity");
+                                            var pe_originalquantity = LLP.Common.Attribute_GetValue(InventoryCheckLine.Enums.DisplayName.General, "pe_originalquantity");
+
+                                            var tempValues = [];
+
+                                            if (LLP.Form.IsCreate()) {
+                                                tempValues = InventoryCheckLine.AllowedStatusCodesForIsCreate;
+                                            }
+                                            else if (quantity == pe_originalquantity) {
+                                                tempValues = InventoryCheckLine.AllowedStatusCodesForQuantityEqual;
+                                            }
+                                            else if (quantity < pe_originalquantity) {
+                                                tempValues = InventoryCheckLine.AllowedStatusCodesForQuantityLessThan;
+                                            }
+                                            else {
+                                                tempValues = InventoryCheckLine.AllowedStatusCodesForQuantityGreaterThan;
+                                            }
+
+                                            for (var i = 0; i < names.length; i++) {
+                                                if (tempValues.indexOf(optionSetValues[names[i]]) >= 0) {
+                                                    filtered[names[i]] = optionSetValues[names[i]];
+                                                }
+                                            }
+
+                                            var detailView = entityForm.getDetailView("General");
+                                            var itemIndex = detailView.getItemIndex("statuscode");
+                                            if (itemIndex >= 0) {
+                                                var filteredNames = Object.getOwnPropertyNames(filtered);
+                                                detailView.updateComboItemDataSource(itemIndex, filtered, "int", filtered[filteredNames[0]]);
+                                            }
+                                        },
+                                        function (error) {
+                                            LLP.LOG.Error(LLP.Enums.Module.InventoryCheckLine, "FilterStatusCodes -> MobileCRM.Metadata.getOptionSetValues callback:", error);
+                                        }, null);
+                                        
+                                    }, MobileCRM.bridge.alert, null);
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.InventoryCheckLine, "FilterStatusCodes:", e);
+                }
+            },
+            CheckStatusCode: function() {
+                try {
+                    var isRequired = false;
+                    switch(LLP.Common.Attribute_GetValue(InventoryCheckLine.Enums.DisplayName.General, "statuscode"))
+                    {
+                        case InventoryCheckLine.Enums.StatusCode.Theft:
+                        case InventoryCheckLine.Enums.StatusCode.Moved:
+                        case InventoryCheckLine.Enums.StatusCode.Found:
+                        case InventoryCheckLine.Enums.StatusCode.Lost:
+                            isRequired = true;
+                            break;
+                    }
+
+                    LLP.Common.Attribute_IsRequired(InventoryCheckLine.Enums.DisplayName.General, "pe_note", isRequired);
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.InventoryCheckLine, "CheckStatusCode:", e);
+                }
+            },
+            SetEditability: function () {
+                try {
+                    var statuscode = LLP.Common.Attribute_GetValue(InventoryCheckLine.Enums.DisplayViewName.General, "statuscode");
+                    var disabled = false;
+                    var attributes = ["pe_customerassetid", "pe_productid", "pe_quantity", "statuscode", "statecode", "pe_note"];
+
+                    for (var i = 0; i < attributes.length; i++) {
+                        LLP.Common.Attribute_IsDisabled(InventoryCheckLine.Enums.DisplayViewName.General, attributes[i], disabled);
+                    }
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.InventoryCheck, "SetEditability", e);
+                }
+            },
+            // ON LOAD FORM
+            OnLoad: function () {
+                try {
+                    MobileCRM.UI.EntityForm.requestObject(function (entityForm) {
+                        LLP.SetExecutionContext(entityForm);
+
+                        var pe_customerassetid = LLP.Common.Attribute_GetValue(InventoryCheckLine.Enums.DisplayName.General, "pe_customerassetid");
+                        var pe_productid = LLP.Common.Attribute_GetValue(InventoryCheckLine.Enums.DisplayName.General, "pe_productid");
+
+                        InventoryCheckLine.CheckIsRequired(pe_customerassetid, pe_productid);
+                        InventoryCheckLine.CheckOriginalQuantityField(pe_customerassetid, pe_productid);
+                        InventoryCheckLine.CheckStatusCode();
+                        InventoryCheckLine.FilterStatusCodes();
+                        LLP.Common.Attribute_Required(InventoryCheckLine.Enums.DisplayName.General, "pe_quantity");
+
+                        LLP.Fetch.IsAttributeValue(LLP.Common.GetAttributeValue(entityForm.entity, "pe_inventorycheckid"), "statuscode", InventoryCheckLine.Enums.InventoryCheckStatusCode.Completed, function (isSet) {
+
+                            MobileCRM.UI.EntityForm.requestObject(function (entityForm) {
+                                LLP.SetExecutionContext(entityForm);
+                                if (isSet) {
+                                    LLP.Form.Disabled(true);
+                                }
+                                else {
+                                    InventoryCheckLine.SetEditability();
+                                }
+                            },
+                            function (error) {
+                                LLP.LOG.Error(LLP.Enums.Module.InventoryCheckLine, "OnLoad -> LLP.Fetch.IsAttributeValue -> callback -> MobileCRM.UI.EntityForm.requestObject", e);
+                            }, null);
+
+                        });
+                    });
+
+                    MobileCRM.UI.EntityForm.onItemChange("pe_customerassetid", InventoryCheckLine.OnChange_CustommerAsset, true, null);
+                    MobileCRM.UI.EntityForm.onItemChange("pe_productid", InventoryCheckLine.OnChange_Product, true, null);
+                    MobileCRM.UI.EntityForm.onItemChange("statuscode", InventoryCheckLine.OnChange_StatusCode, true, null);
+                    MobileCRM.UI.EntityForm.onItemChange("pe_quantity", InventoryCheckLine.OnChange_Quantity, true, null);
+                    MobileCRM.Localization.initialize(InventoryCheckLine.FilteredPickList, MobileCRM.bridge.alert,null);
+                } catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.InventoryCheckLine, "OnLoad:", e);
+                }
+            },
+        };
+
+        window.onload = function ()
+        {
+            InventoryCheckLine.OnLoad();
+        }
+    </script>
+
+</body>
+</html>

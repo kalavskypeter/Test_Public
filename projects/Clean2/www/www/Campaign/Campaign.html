@@ -1,0 +1,98 @@
+﻿<!DOCTYPE html>
+
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="utf-8" />
+    <title>Empty Offline HTML page</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="initial-scale=1, user-scalable=no" />
+    <script src="..\Common\JSBridge.js"></script>
+    <script src="..\Common\pe_GlobalCommonFunctions.js"></script>
+</head>
+<body>
+    <label id="logLabel"></label>
+    <script>
+
+        //***************************************************************************************
+        //Task 5031 |
+        //----------
+        //Resco i CRM:
+        //---------
+        //entita: campaign
+
+        //Je-li pe_promotiontype = 100.000.000 (Promo Package (BOGOF)), pak nasledujici pole nastavit jako povinna:
+        //- pe_promotionalgorithm
+        //- pe_numberofproducts
+        //- pe_giftdescription
+
+        //Jinak jsou nepovinna.
+
+        var Campaign = Campaign || {
+            Enums: {
+                DisplayViewName: {
+                    General: "General"
+                },
+                PromotionType: {
+                    PromoPackageBOGOF: 100000000,
+                    PromoExecution: 100000001,
+                    PricePromo: 100000002,
+                    UnderCapPromo: 100000003,
+                }
+            },
+            CheckPromotionType: function() {
+                try {
+                    var pe_promotiontype = LLP.Common.Attribute_GetValue(Campaign.Enums.DisplayViewName.General, "pe_promotiontype");
+                    var required = pe_promotiontype == Campaign.Enums.PromotionType.PromoPackageBOGOF;
+                    if (required) {
+                        LLP.Common.Attribute_RequiredWithPossibleNullValue(Campaign.Enums.DisplayViewName.General, "pe_promotionalgorithm", -1);
+                    }
+                    else {
+                        LLP.Common.Attribute_IsRequired(Campaign.Enums.DisplayViewName.General, "pe_promotionalgorithm", required);
+                    }
+                    LLP.Common.Attribute_IsRequired(Campaign.Enums.DisplayViewName.General, "pe_numberofproducts", required);
+                    LLP.Common.Attribute_IsRequired(Campaign.Enums.DisplayViewName.General, "pe_giftdescription", required);
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Campaign, "CheckPromotionType", e);
+                }
+            },
+            SetEditability: function() {
+                try {
+                    LLP.Form.Disabled(true);
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Campaign, "SetEditability", e);
+                }
+            },
+            OnChange_PromotionType: function (entityForm) {
+                try {
+                    LLP.SetExecutionContext(entityForm);
+                    Campaign.CheckPromotionType();
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Campaign, "OnChange_PromotionType", e);
+                }
+            },
+            OnLoad: function () {
+                try
+                {
+                    MobileCRM.UI.EntityForm.onItemChange("pe_promotiontype", Campaign.OnChange_PromotionType, true, null);
+                    MobileCRM.UI.EntityForm.requestObject(function (entityForm) {
+                        LLP.SetExecutionContext(entityForm);
+                        Campaign.SetEditability();
+                        Campaign.CheckPromotionType();
+                    });
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.Campaign, "OnLoad", e);
+                }
+            }
+        }
+
+        window.onload = function () {
+            Campaign.OnLoad();
+        }
+
+    </script>
+</body>
+</html>

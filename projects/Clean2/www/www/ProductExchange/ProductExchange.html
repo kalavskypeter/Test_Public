@@ -1,0 +1,317 @@
+﻿<!DOCTYPE html>
+
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="utf-8" />
+    <title>Empty Offline HTML page</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="initial-scale=1, user-scalable=no" />
+    <script src="..\Common\JSBridge.js"></script>
+    <script src="..\Common\pe_GlobalCommonFunctions.js"></script>
+    <script src="..\Common\jquery-3.3.1.min.js"></script>
+    <script src="..\Common\popper.min.js"></script>
+    <script src="..\Common\bootstrap.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="..\Common\bootstrap.min.css">
+    <style>
+        .submit {
+            margin: 10px;
+        }
+    </style>
+</head>
+<body onload="ProductExchange.OnLoad();">
+    <div class="container mt-1">
+        <button id="btnComplete" class="btn btn-primary btn-block submit mt-1" onclick="ProductExchange.OnClick_Complete();">Completed</button>
+    </div>
+    
+    <label id="logLabel"></label>
+    <script>
+
+        //Task 4993
+        //doufám, že to popíšu srozumitelně, funkce pouze v Resco, CRM pak pro čtení:
+
+        //Mám entitu Product Exchange, která má 2 stavy: Draft, Submitted
+        //ve stavu Draft na hlavičce upravuji data (account, contact, date...) a pak mam 2 navazne enitty:
+        //pe_productexchangereturned
+        //pe_productexchangeissuedp
+        //oboje jsou provázané přes lookup: pe_productexchangeid
+
+        //a jakmile obchodník doplní všechny řádky, zákazník se podepíše, obchodník klikne na tlačítko "Submit", celý záznam se zamkne včetně obou subgridů 
+        //a jejich řádek = hlavička půjde do stavu Commited, řádky v subgridech bych nechal ve standardním stavu "inactive" (submitted je jen přejmenovaný inactive stav)
+
+
+        //Task 4991
+        //Resco - jak obejit quick view:
+
+        //Potřeboval bych programově vytvořit pole (vlozit ho pod oddelovaci caru - pokud pujde) a dotahnout informace z Accountu:
+        //Customer ID: pe_accountid.msdyn_externalaccountid
+        //Address: (ulice, mesto, PSC, stat) pe_accountid.address1_line1, pe_accountid.address1_city, pe_accountid.address1_postalcode, pe_accountid.address1_country
+        //Area: pe_accountid.pe_areaid
+        //District: pe_accountid.territoryid
+        //Region: pe_accountid.pe_regionid
+        
+        var ProductExchange = ProductExchange || {
+            Assets: null,
+            RecordsSaved: 0,
+            RecordsCountToSave: 0,
+            Enums: {
+                StateCode:
+                {
+                    Active: 0,
+                    Inactive: 1
+                },
+                StatusCode:
+                {
+                    Draft: 1,
+                    Completed: 100000002,
+                    Inactive: 2
+                },
+                RelatedEntityStateCode: {
+                    Active: 0,
+                    Inactive: 1
+                },
+                RelatedEntityStatusCode: {
+                    Active: 1,
+                    Inactive: 2
+                },
+                // Detail view display name
+                DisplayName: {
+                    General: "General"
+                }
+            },
+            SetToCompleted: false,
+            SetToInactiveRecords: function (records, suspendPostSaveHandler) {
+                var recordsCountToSave = records.length
+                var recordsSaved = 0;
+                for (var i = 0; i < records.length; i++) {
+                    MobileCRM.DynamicEntity.loadById(records[i].entityName, records[i].id, function (result) {
+                        LLP.Common.SetAttributeValue(result, "statecode", ProductExchange.Enums.RelatedEntityStateCode.Inactive);
+                        LLP.Common.SetAttributeValue(result, "statuscode", ProductExchange.Enums.RelatedEntityStatusCode.Inactive);
+                        result.save(function (error) {
+                            if (error) {
+                                LLP.LOG.Error(LLP.Enums.Module.ProductExchange, "SetToInactiveRecords -> save:", error);
+                            } else {
+                                recordsSaved++;
+                            }
+
+                            if (recordsSaved == recordsCountToSave) {
+                                suspendPostSaveHandler.resumePostSave();
+                            }
+                        });
+                    },
+                    function (error) {
+                        LLP.LOG.Error(LLP.Enums.Module.ProductExchange, "SetToInactiveRecords -> MobileCRM.DynamicEntity.loadById:", error);
+                    });
+                }
+            },
+            SetAccountDetailValues: function(entityForm) {
+                try {
+                    if (entityForm) {
+                        LLP.SetExecutionContext(entityForm);
+                    }
+                    
+                    var pe_accountid = LLP.Common.Attribute_GetValue(ProductExchange.Enums.DisplayName.General, "pe_accountid");
+
+                    if (pe_accountid) {
+                        var pe_account = MobileCRM.DynamicEntity.loadById(pe_accountid.entityName, pe_accountid.id,
+                            function (result) {
+                                MobileCRM.UI.EntityForm.requestObject(function (entityForm) {
+                                    LLP.SetExecutionContext(entityForm);
+                                    var addTextBox = false;
+                                    var textbox = LLP.Common.Attribute_Get(ProductExchange.Enums.DisplayName.General, "accountdetail");
+                                    if (!textbox) {
+                                        addTextBox = true;
+                                        textbox = new MobileCRM.UI.DetailViewItems.TextBoxItem("accountdetail", "Account Detail");
+                                        textbox.isEnabled = false;
+                                        textbox.maxLength = 5000;
+                                        textbox.numberOfLines = 5;
+                                        textbox.style = "MultiLine";
+                                    }
+                                    
+                                    textbox.value = "";
+                                    ProductExchange.AddValueToMultiline(textbox, "Customer ID: ", LLP.Common.GetAttributeValue(result, "msdyn_externalaccountid"), false);
+                                    ProductExchange.AddValueToMultiline(textbox, "Address: ", LLP.Common.GetAttributeValue(result, "address1_line1"), true);
+                                    ProductExchange.AddValueToMultiline(textbox, ", ", LLP.Common.GetAttributeValue(result, "address1_city"), false, true);
+                                    ProductExchange.AddValueToMultiline(textbox, ", ", LLP.Common.GetAttributeValue(result, "address1_postalcode"), false, true);
+                                    ProductExchange.AddValueToMultiline(textbox, ", ", LLP.Common.GetAttributeValue(result, "address1_country"), false, true);
+                                    ProductExchange.AddValueToMultiline(textbox, "Area: ", LLP.Common.GetAttributeValue(result, "pe_areaid"), true);
+                                    ProductExchange.AddValueToMultiline(textbox, "District: ", LLP.Common.GetAttributeValue(result, "territoryid"), true);
+                                    ProductExchange.AddValueToMultiline(textbox, "Region: ", LLP.Common.GetAttributeValue(result, "pe_regionid"), true);
+                                    
+                                    if (addTextBox) {
+                                        var detailView = entityForm.getDetailView(ProductExchange.Enums.DisplayName.General);
+                                        detailView.insertItem(textbox, -1);
+                                    }
+
+                                    var accountdetail = LLP.Common.Attribute_Get(ProductExchange.Enums.DisplayName.General, "accountdetail");
+                                    if (accountdetail) {
+                                        LLP.Common.Attribute_Visible(ProductExchange.Enums.DisplayName.General, "accountdetail");
+                                    }
+                                },
+                                function (error) {
+                                    LLP.LOG.Error(LLP.Enums.Module.ProductExchange, "SetAccountDetailValues -> MobileCRM.UI.EntityForm.requestObject:", error);
+                                }, null);
+                                
+                            },
+                            function (error) {
+                                LLP.LOG.Error(LLP.Enums.Module.ProductExchange, "SetAccountDetailValues -> load account MobileCRM.DynamicEntity.loadById (" + pe_accountid.id + "):", error);
+                            }, null);
+                    }
+                    else {
+                        var textbox = LLP.Common.Attribute_Get(ProductExchange.Enums.DisplayName.General, "accountdetail");
+                        if (textbox) {
+                            LLP.Common.Attribute_Invisible(ProductExchange.Enums.DisplayName.General, "accountdetail");
+                        }
+                    }
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.ProductExchange, "SetAccountDetailValues:", e);
+                }
+            },
+            //TODO? hodit to do globalu?
+            AddValueToMultiline: function (control, text, value, newLine, textIsDelimiter) {
+
+                if (!control.value) {
+                    control.value = "";
+                }
+
+                if (newLine) {
+                    control.value += "\n";
+                }
+
+                if (!textIsDelimiter) {
+                    control.value += text;
+                }
+
+                if (value && textIsDelimiter) {
+                    control.value += text + value;
+                }
+                else if (value) {
+                    control.value += value;
+                }
+            },
+            SetCompleted: function (entityForm) {
+                LLP.Common.SetAttributeValue(entityForm.entity, "statuscode", ProductExchange.Enums.StatusCode.Completed);
+            },
+            OnClick_Complete: function () {
+                try {
+                    ProductExchange.SetToCompleted = true;
+                    MobileCRM.UI.EntityForm.requestObject(function (entityForm) {
+                        if (!entityForm.isDirty) {
+                            LLP.SetExecutionContext(entityForm);
+                            ProductExchange.SetCompleted(entityForm);
+                        }
+                        MobileCRM.UI.EntityForm.save();
+                    },
+                    function(error) {
+                        LLP.LOG.Error(LLP.Enums.Module.ProductExchange, "OnClick_Complete -> requestObject:", error);
+                    }, null);
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.ProductExchange, "OnClick_Complete:", e);
+                }
+            },
+            OnLoad: function () {
+                try {
+                    MobileCRM.UI.EntityForm.onSave(ProductExchange.OnSave, true, null);
+                    MobileCRM.UI.EntityForm.onPostSave(ProductExchange.OnPostSave, true, null);
+                    MobileCRM.UI.EntityForm.onItemChange("pe_accountid", ProductExchange.SetAccountDetailValues, true, null);
+                    MobileCRM.UI.EntityForm.requestObject(function (entityForm) {
+                        LLP.SetExecutionContext(entityForm);
+
+                        var disabled = LLP.Form.IsCreate();
+                        var allAttributes = LLP.Common.Attribute_GetAllInView(ProductExchange.Enums.DisplayName.General);
+
+                        if (LLP.Common.GetAttributeValue(entityForm.entity, "statuscode") == ProductExchange.Enums.StatusCode.Completed) {
+                            disabled = true;
+                        }
+
+                        for (var i = 0; i < allAttributes.length; i++) {
+                            if (allAttributes[i].name != "accountdetail") {
+                                LLP.Common.Attribute_IsDisabled(ProductExchange.Enums.DisplayName.General, allAttributes[i].name, !LLP.Form.IsCreate() && disabled);
+                            }
+                        }
+
+                        if (disabled) {
+                            document.getElementById("btnComplete").hidden = true;
+
+                            if (!LLP.Form.IsCreate()) {
+                                entityForm.setTabVisibility("Actions", false);
+                            }
+                        }
+
+                        ProductExchange.SetAccountDetailValues();
+                    },
+                    function (error) {
+                        LLP.LOG.Error(LLP.Enums.Module.ProductExchange, "OnLoad -> requestObject:", error);
+                    }, null)
+                } catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.ProductExchange, "OnLoad:", e);
+                }
+            },
+            OnSave: function(entityForm) {
+                try {
+                    if (ProductExchange.SetToCompleted) {
+                        ProductExchange.SetCompleted(entityForm);
+                    }
+                }
+                catch (e) {
+                    LLP.LOG.Error(LLP.Enums.Module.ProductExchange, "OnSave:", e);
+                }
+            },
+            OnPostSave: function (entityForm) {
+                LLP.SetExecutionContext(entityForm);
+
+                if (LLP.Common.GetAttributeValue(entityForm.entity, "statuscode") != ProductExchange.Enums.StatusCode.Completed) {
+                    return;
+                }
+
+                var suspendPostSave = entityForm.suspendPostSave();
+                var pe_productexchangereturnedRecords = [];
+                var pe_productexchangeissuedpRecords = [];
+
+                var pe_productexchangereturnedQuery =
+                            '<fetch>\
+		                        <entity name="pe_productexchangereturned">\
+                                <attribute name="pe_productexchangereturnedid" />\
+		                        <filter type="and">\
+			                        <condition attribute="pe_productexchangeid" operator="eq" value="' + entityForm.entity.id + '" />\
+		                        </filter>\
+		                        </entity>\
+	                        </fetch>';
+
+                var pe_productexchangeissuedpQuery =
+                            '<fetch>\
+		                        <entity name="pe_productexchangeissuedp">\
+                                <attribute name="pe_productexchangeissuedpid" />\
+		                        <filter type="and">\
+			                        <condition attribute="pe_productexchangeid" operator="eq" value="' + entityForm.entity.id + '" />\
+		                        </filter>\
+		                        </entity>\
+	                        </fetch>';
+
+                MobileCRM.FetchXml.Fetch.deserializeFromXml(pe_productexchangereturnedQuery, function (fetch) {
+                    fetch.execute("DynamicEntities", function (result) {
+                        pe_productexchangereturnedRecords = result;
+
+                        MobileCRM.FetchXml.Fetch.deserializeFromXml(pe_productexchangeissuedpQuery, function (fetch) {
+                            fetch.execute("DynamicEntities", function (result) {
+                                pe_productexchangeissuedpRecords = result;
+
+                                try
+                                {
+                                    ProductExchange.SetToInactiveRecords(pe_productexchangereturnedRecords.concat(pe_productexchangeissuedpRecords), suspendPostSave);
+                                }
+                                catch (e) {
+                                    LLP.LOG.Error(LLP.Enums.Module.ProductExchange, "OnPostSave -> trying to set states to inactive:", e);
+                                }
+
+                            }, MobileCRM.bridge.alert);
+                        }, MobileCRM.bridge.alert);
+                    }, MobileCRM.bridge.alert);
+                }, MobileCRM.bridge.alert);
+            }
+        };
+    </script>
+
+</body>
+</html>
