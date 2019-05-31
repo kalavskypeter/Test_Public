@@ -1,0 +1,108 @@
+﻿<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+	<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="viewport-fit=cover, width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no" />
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+
+    <title>Onboarding</title>
+
+
+    <link rel="stylesheet" type="text/css" href="./css/swiper.min.css" />
+    <link rel="stylesheet" type="text/css" href="./css/global.min.css" />
+    <link id="deviceStyle" rel="stylesheet" type="text/css" href="./css/phone.min.css" />
+</head>
+
+<body>
+    <main class="swiper-container">
+        <div id="swiper" class="swiper-wrapper">
+
+            <!-- Slide 01 : Meet-->
+            <div class="swiper-slide">
+                <div class="layer-img" data-swiper-parallax="-144">
+                    <div class="layer-screen">
+                        <div>
+                            <img src="img/screen-phone-01.png" alt="Resco Mobile CRM app">
+                        </div>
+                    </div>
+
+                </div>
+                <div class="layer-txt">
+                    <h1>Meet Resco Inspections </h1>
+                    <p>Your expert in the field inspections &mda whether it is a machine repair, on-site inspection, or simply collecting customer's feedback.</p>
+                </div>
+            </div>
+
+            <!-- Slide 02 : Access your -->
+            <div class="swiper-slide">
+                <div class="layer-img" data-swiper-parallax="-144">
+                    <div class="layer-screen">
+                        <div>
+                            <img src="img/screen-phone-02.png">
+                        </div>
+                    </div>
+                </div>
+                <div class="layer-txt">
+                    <h1>Access your records</h1>
+                    <p>See your appointments, fill out the questionnaires, and generate reports, regardless the internet connection.</p>
+                </div>
+            </div>
+
+            <!-- Slide 03 : Customize -->
+            <div class="swiper-slide">
+                <div class="layer-img" data-swiper-parallax="-144">
+                    <div class="layer-screen">
+                        <div>
+                            <img src="img/screen-phone-03.png">
+                        </div>
+                    </div>
+                    <div class="layer-buble">
+                        <div id="c01" data-swiper-parallax-x="140%" data-swiper-parallax-y="0%" data-swiper-parallax-opacity="0"><img src="img/cyrcle01.png"></div>
+                        <div id="c02" data-swiper-parallax-x="140%" data-swiper-parallax-y="0%" data-swiper-parallax-opacity="0"><img src="img/cyrcle02.png"></div>
+                    </div>
+                </div>
+                <div class="layer-txt">
+                    <h1>Customize further</h1>
+                    <p>If needed, modify the UI and app functionality the same way as any other Resco app.</p>
+                </div>
+            </div>
+
+            <!-- Slide 04 : Synchronize -->
+            <div class="swiper-slide">
+                <div class="layer-img" data-swiper-parallax="-144">
+                    <div class="layer-screen">
+                        <div>
+                            <img src="img/screen-phone-04.png">
+                        </div>
+                    </div>
+                </div>
+                <div class="layer-txt">
+                    <h1>Let the Inspections begin</h1>
+                    <p>Use the demo data, or connect to your organization to see your own data.</p>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <footer>
+        <div class="swiper-pagination swiper-pagination-bullets"></div>
+        <nav>
+            <ul>
+                <li class="swiper-button-prev"></li>
+                <li>
+                    <a id="footerAction" href="javascript:MobileCRM.bridge.closeForm();">Skip the tour</a>
+                </li>
+                <li class="swiper-button-next"></li>
+            </ul>
+        </nav>
+    </footer>
+    <script type="text/javascript" src="../JSBridge.js"></script>
+    <script src="./script/swiper.min.js"></script>
+    <script type="text/javascript" src="./script/settings.min.js"></script>
+</body>
+
+</html>

@@ -1,0 +1,90 @@
+.layer-img {
+    width: 100vw;
+    height: 70vh;
+    background-image: url("../img/phone.png");
+    background-size: auto 70vh;
+    background-position: bottom center;
+}
+
+.layer-screen div {
+    height: 70vh
+}
+
+.layer-screen div img {
+    height: 63.5vh
+}
+
+.layer-buble #c01 {
+    left: 3vh;
+    top: 13vw
+}
+
+.layer-buble #c02 {
+    right: 0;
+    top: 20vh;
+    z-index: 1000;
+}
+
+.layer-buble #RC {
+    left: 0;
+    top: 15vh
+}
+
+.layer-txt {
+    bottom: 0;
+    min-height: 38%
+}
+
+.layer-txt p {
+    margin-bottom: 22%
+}
+
+footer {
+    height: 12%
+}
+
+@media only screen and (device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3) {
+    .layer-img,
+    .layer-screen div {
+        height: 70vh
+    }
+    .layer-txt {
+        min-height: 35%
+    }
+}
+
+@media screen and (orientation: landscape) {
+    .layer-img {
+        width: 50vw;
+        height: 100vh;
+        background-size: auto 90.8vh
+    }
+    .layer-screen div {
+        height: 100vh
+    }
+    .layer-screen div img {
+        width: auto;
+        height: 82vh
+    }
+    .layer-txt {
+        display: -webkit-box;
+        display: -ms-flexbox;
+        display: flex;
+        -webkit-box-orient: vertical;
+        -webkit-box-direction: normal;
+        -ms-flex-direction: column;
+        flex-direction: column;
+        -webkit-box-pack: center;
+        -ms-flex-pack: center;
+        justify-content: center;
+        bottom: 0;
+        height: 100vh;
+        width: 50vw;
+        right: 0
+    }
+    footer {
+        height: 20%;
+        right: 0;
+        width: 50vw
+    }
+}

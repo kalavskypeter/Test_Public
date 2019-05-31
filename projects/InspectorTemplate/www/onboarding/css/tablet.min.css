@@ -1,0 +1,95 @@
+.layer-img {
+    width: 100vw;
+    height: 70vh;
+    background-image: url("../img/device-tablet.png");
+    background-size: auto 71.5vh
+}
+
+.layer-screen div {
+    height: 70vh
+}
+
+.layer-screen div img {
+    width: auto;
+    height: 60.3vh
+}
+
+.layer-buble div img {
+    width: 20vw
+}
+
+.layer-buble #MS {
+    left: 40vw;
+    top: 4vh
+}
+
+.layer-buble #SF {
+    right: 15vw;
+    top: 10vh
+}
+
+.layer-buble #RC {
+    left: 15vw;
+    top: 10vh
+}
+
+.layer-txt {
+    min-height: 30vh;
+    bottom: 0
+}
+
+.layer-txt p {
+    width: 60vw;
+    margin: auto
+}
+
+footer {
+    height: 12%
+}
+
+footer .swiper-pagination {
+    margin: .3em auto
+}
+
+@media screen and (orientation: portrait) {
+    .layer-img {
+        height: 60vh;
+        background-size: auto 40.5vh
+    }
+
+    .layer-screen div {
+        height: 60vh
+    }
+
+    .layer-screen div img {
+        height: 37.5vh
+    }
+
+    .layer-txt {
+        -webkit-box-orient: vertical;
+        -webkit-box-direction: normal;
+        -ms-flex-direction: column;
+        flex-direction: column;
+        -webkit-box-pack: center;
+        -ms-flex-pack: center;
+        justify-content: center;
+        height: 40vh;
+        padding-top: 3em
+    }
+
+    .layer-buble #MS {
+        left: 38vw
+    }
+
+    .layer-buble div img {
+        width: 24vw
+    }
+
+    footer {
+        height: 10vh
+    }
+
+    .swiper-pagination {
+        margin: 1em auto
+    }
+}
