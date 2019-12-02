@@ -1,0 +1,42 @@
+﻿<EntityForm xsi:dummy="0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" flexi="0" fleximode="1" fullscreen="0" resize="0" version="2">
+  <IsContactForm>false</IsContactForm>
+  <EntityName>opportunity</EntityName>
+  <CamelCase>Opportunity</CamelCase>
+  <PrimaryCommands>!defcmd</PrimaryCommands>
+  <EnabledWorkflows>OnLoadEnabled OnChangeEnabled OnSaveEnabled OnExecuteCommand OnCanExecuteCommand</EnabledWorkflows>
+  <SerializedChildrenV2>
+    <FormTab xsi:type="DetailTab" flexiHeader="2">
+      <Name>General</Name>
+      <SerializedChildren>
+        <DetailItem SchemaName="name"/>
+        <DetailItem SchemaName="customerid"/>
+        <DetailItem separator="true" xsi:type="SeparatorDetailItem">
+          <IsConstant>true</IsConstant>
+        </DetailItem>
+        <DetailItem SchemaName="transactioncurrencyid"/>
+        <DetailItem SchemaName="pricelevelid"/>
+        <DetailItem separator="true" xsi:type="SeparatorDetailItem">
+          <IsConstant>true</IsConstant>
+        </DetailItem>
+        <DetailItem SchemaName="isrevenuesystemcalculated"/>
+        <DetailItem SchemaName="estimatedvalue"/>
+        <DetailItem separator="true" xsi:type="SeparatorDetailItem">
+          <IsConstant>true</IsConstant>
+        </DetailItem>
+        <DetailItem SchemaName="opportunityratingcode"/>
+      </SerializedChildren>
+    </FormTab>
+    <FormTab xsi:type="AssociatedTab" flexiHeader="2">
+      <Name>Opportunity Products List</Name>
+      <Binding SchemaName="opportunityproduct.opportunityid"/>
+    </FormTab>
+    <FormTab xsi:type="AssociatedTab" flexiHeader="2">
+      <Name>Activity List</Name>
+      <Binding SchemaName="activity.regardingobjectid"/>
+    </FormTab>
+    <FormTab xsi:type="AssociatedTab" flexiHeader="2">
+      <Name>Notes List</Name>
+      <Binding SchemaName="annotation.objectid"/>
+    </FormTab>
+  </SerializedChildrenV2>
+</EntityForm>
